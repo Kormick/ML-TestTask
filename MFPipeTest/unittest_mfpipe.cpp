@@ -75,49 +75,62 @@ bool testBuffer(bool read)
 		MFPipeImpl writePipe;
 		if (writePipe.PipeCreate(testPipeName, "") == S_OK)
 		{
-			for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
+			if (writePipe.PipeOpen(testPipeName, 32, "W") == S_OK)
 			{
-				auto res = writePipe.PipePut("", arrBuffersIn[i], 1000, "");
-				std::cout << "Write " << i << " res " << res << std::endl;
-
-				if (res != S_OK)
+				for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
 				{
-					std::cout << "Failed to write into pipe" << std::endl;
-					testRes = false;
-					break;
+					auto res = writePipe.PipePut("", arrBuffersIn[i], 1000, "");
+					std::cout << "Write " << i << " res " << res << std::endl;
+
+					if (res != S_OK)
+					{
+						std::cout << "Failed to write into pipe" << std::endl;
+						testRes = false;
+						break;
+					}
 				}
+				writePipe.PipeClose();
+			}
+			else
+			{
+				std::cout << "Failed to open pipe on write." << std::endl;
+				testRes = false;
 			}
 		}
 		else
 		{
-			std::cout << "Faailed to create pipe." << std::endl;
+			std::cout << "Failed to create pipe." << std::endl;
 			testRes = false;
 		}
-
-		writePipe.PipeClose();
 	} else {
 		std::cout << "READ" << std::endl;
 
 		MFPipeImpl readPipe;
-		readPipe.PipeOpen(testPipeName, 0, "");
-
-		for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
+		if (readPipe.PipeOpen(testPipeName, 32, "R") == S_OK)
 		{
-			std::shared_ptr<MF_BASE_TYPE> buf;
-			auto res = readPipe.PipeGet("", buf, 1000, "");
-			std::cout << "Read " << i << " res " << res << std::endl;
-
-			const auto dp = dynamic_cast<MF_BUFFER *>(arrBuffersIn[i].get());
-			const auto bp = dynamic_cast<MF_BUFFER *>(buf.get());
-
-			if (*dp != *bp)
+			for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
 			{
-				std::cout << "Read invalid data." << std::endl;
-				testRes = false;
-			}
-		}
+				std::shared_ptr<MF_BASE_TYPE> buf;
+				auto res = readPipe.PipeGet("", buf, 1000, "");
+				std::cout << "Read " << i << " res " << res << std::endl;
 
-		readPipe.PipeClose();
+				const auto dp = dynamic_cast<MF_BUFFER *>(arrBuffersIn[i].get());
+				const auto bp = dynamic_cast<MF_BUFFER *>(buf.get());
+
+				if (*dp != *bp)
+				{
+					std::cout << "Read invalid data." << std::endl;
+					testRes = false;
+				}
+			}
+
+			readPipe.PipeClose();
+		}
+		else
+		{
+			std::cout << "Failed to open pipe on read" << std::endl;
+			testRes = false;
+		}
 	}
 
 	return testRes;
@@ -645,15 +658,15 @@ int main(int argc, char *argv[])
 		return res ? "OK" : "FAILED";
 	};
 
-	{
-		bool res = testParser();
-		std::cout << "Parser: " << bool_to_str(res) << std::endl;
-	}
+//	{
+//		bool res = testParser();
+//		std::cout << "Parser: " << bool_to_str(res) << std::endl;
+//	}
 
-	{
-		bool res = testPipeCreate();
-		std::cout << "PipeCreate(): " << bool_to_str(res) << std::endl;
-	}
+//	{
+//		bool res = testPipeCreate();
+//		std::cout << "PipeCreate(): " << bool_to_str(res) << std::endl;
+//	}
 
 	if (argc > 1)
 	{
@@ -666,38 +679,38 @@ int main(int argc, char *argv[])
 		std::cout << "Buffer write: " << bool_to_str(res) << std::endl;
 	}
 
-	if (argc > 1)
-	{
-		bool res = testFrame(true);
-		std::cout << "Frame read: " << bool_to_str(res) << std::endl;
-	}
-	else
-	{
-		bool res = testFrame(false);
-		std::cout << "Frame write: " << bool_to_str(res) << std::endl;
-	}
+//	if (argc > 1)
+//	{
+//		bool res = testFrame(true);
+//		std::cout << "Frame read: " << bool_to_str(res) << std::endl;
+//	}
+//	else
+//	{
+//		bool res = testFrame(false);
+//		std::cout << "Frame write: " << bool_to_str(res) << std::endl;
+//	}
 
-	if (argc > 1)
-	{
-		bool res = testMessage(true);
-		std::cout << "Message read: " << bool_to_str(res) << std::endl;
-	}
-	else
-	{
-		bool res = testMessage(false);
-		std::cout << "Message write: " << bool_to_str(res) << std::endl;
-	}
+//	if (argc > 1)
+//	{
+//		bool res = testMessage(true);
+//		std::cout << "Message read: " << bool_to_str(res) << std::endl;
+//	}
+//	else
+//	{
+//		bool res = testMessage(false);
+//		std::cout << "Message write: " << bool_to_str(res) << std::endl;
+//	}
 
-	if (argc > 1)
-	{
-		bool res = testAll(true);
-		std::cout << "Test all read: " << bool_to_str(res) << std::endl;
-	}
-	else
-	{
-		bool res = testAll(false);
-		std::cout << "Test all write: " << bool_to_str(res) << std::endl;
-	}
+//	if (argc > 1)
+//	{
+//		bool res = testAll(true);
+//		std::cout << "Test all read: " << bool_to_str(res) << std::endl;
+//	}
+//	else
+//	{
+//		bool res = testAll(false);
+//		std::cout << "Test all write: " << bool_to_str(res) << std::endl;
+//	}
 
 	return 0;
 }

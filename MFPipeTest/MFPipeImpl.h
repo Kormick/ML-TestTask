@@ -25,17 +25,25 @@ class PipeReader
 {
 public:
 	PipeReader(const std::string &pipeId,
-			   size_t maxBuffers)
+			   size_t maxBuffers,
+			   std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> dataBuffer,
+			   std::shared_ptr<std::deque<Message>> messageBuffer)
 		: isRunning(false),
 		  pipeId(pipeId),
-		  maxBuffers(maxBuffers)
+		  maxBuffers(maxBuffers),
+		  dataBuffer(dataBuffer),
+		  messageBuffer(messageBuffer)
 	{}
+
+	~PipeReader()
+	{
+		stop();
+	}
 
 	void start()
 	{
 		isRunning = true;
-		thread.reset(new std::thread(&PipeReader::run, this, std::cref(pipeId),
-									 std::ref(dataBuffer), std::ref(messageBuffer)));
+		thread.reset(new std::thread(&PipeReader::run, this, std::cref(pipeId), dataBuffer, messageBuffer));
 	}
 
 	void stop()
@@ -48,15 +56,15 @@ public:
 	}
 
 	void run(const std::string &pipeId,
-			 std::deque<std::shared_ptr<MF_BASE_TYPE>> &dataBuffer,
-			 std::deque<Message> &messageBuffer)
+			 std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> dataBuffer,
+			 std::shared_ptr<std::deque<Message>> messageBuffer)
 	{
 		while (isRunning)
 		{
 			if (!mutex.try_lock_for(std::chrono::milliseconds(10)))
 				continue;
 
-			if (dataBuffer.size() >= maxBuffers || messageBuffer.size() >= maxBuffers)
+			if (dataBuffer->size() >= maxBuffers || messageBuffer->size() >= maxBuffers)
 			{
 				mutex.unlock();
 				continue;
@@ -87,7 +95,7 @@ public:
 						const auto data = parser.getData();
 
 						MF_BUFFER buffer;
-						dataBuffer.push_back(std::shared_ptr<MF_BASE_TYPE>(buffer.deserialize(data)));
+						dataBuffer->push_back(std::shared_ptr<MF_BASE_TYPE>(buffer.deserialize(data)));
 						parser.reset();
 						break;
 					}
@@ -96,7 +104,7 @@ public:
 						const auto data = parser.getData();
 
 						MF_FRAME frame;
-						dataBuffer.push_back(std::shared_ptr<MF_BASE_TYPE>(frame.deserialize(data)));
+						dataBuffer->push_back(std::shared_ptr<MF_BASE_TYPE>(frame.deserialize(data)));
 						parser.reset();
 						break;
 					}
@@ -105,7 +113,7 @@ public:
 						const auto data = parser.getData();
 
 						Message message;
-						messageBuffer.push_back(message.deserialize(data));
+						messageBuffer->push_back(message.deserialize(data));
 						parser.reset();
 						break;
 					}
@@ -126,45 +134,65 @@ private:
 	std::unique_ptr<std::thread> thread;
 	std::timed_mutex mutex;
 
-	std::deque<std::shared_ptr<MF_BASE_TYPE>> dataBuffer;
-	std::deque<Message> messageBuffer;
+	std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> dataBuffer;
+	std::shared_ptr<std::deque<Message>> messageBuffer;
 	Parser parser;
 };
 
 class PipeWriter
 {
 public:
-	PipeWriter(const std::string &pipeId)
+	PipeWriter(const std::string &pipeId,
+			   std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> dataBuffer,
+			   std::shared_ptr<std::deque<Message>> messageBuffer)
 		: isRunning(false),
-		  pipeId(pipeId)
+		  pipeId(pipeId),
+		  dataBuffer(dataBuffer),
+		  messageBuffer(messageBuffer)
 	{}
+
+	~PipeWriter()
+	{
+		stop();
+	}
 
 	void start()
 	{
 		isRunning = true;
-		thread.reset(new std::thread(&PipeWriter::run, this, std::cref(pipeId),
-									 std::ref(dataBuffer), std::ref(messageBuffer)));
+		thread.reset(new std::thread(&PipeWriter::run, this, std::cref(pipeId), dataBuffer, messageBuffer));
 	}
 
 	void stop()
 	{
+		bool wait = true;
+		while (wait)
 		{
-			std::unique_lock<std::timed_mutex> lock(mutex);
-			isRunning = false;
+			mutex.lock();
+
+			if (dataBuffer->empty() && messageBuffer->empty())
+				break;
+
+			mutex.unlock();
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
 		}
+
+//		{
+//			std::unique_lock<std::timed_mutex> lock(mutex);
+//			isRunning = false;
+//		}
 		thread->join();
 	}
 
 	void run(const std::string &pipeId,
-			 std::deque<std::shared_ptr<MF_BASE_TYPE>> &dataBuffer,
-			 std::deque<Message> &messageBuffer)
+			 std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> dataBuffer,
+			 std::shared_ptr<std::deque<Message>> messageBuffer)
 	{
 		while (isRunning)
 		{
 			if (!mutex.try_lock_for(std::chrono::milliseconds(10)))
 				continue;
 
-			if (dataBuffer.empty() && messageBuffer.empty())
+			if (dataBuffer->empty() && messageBuffer->empty())
 			{
 				mutex.unlock();
 				continue;
@@ -177,13 +205,15 @@ public:
 				continue;
 			}
 
-			if (!dataBuffer.empty())
+			if (!dataBuffer->empty())
 			{
-				auto dataPtr = dataBuffer.front();
-				dataBuffer.pop_front();
+				auto dataPtr = dataBuffer->front();
+				dataBuffer->pop_front();
 
 				const auto data = dataPtr->serialize();
 				size_t bytesWritten = 0;
+
+				std::cout << "Trying to write " << data.size() << " bytes" << std::endl;
 
 				while (bytesWritten < data.size())
 				{
@@ -192,10 +222,10 @@ public:
 						bytesWritten += bytes;
 				}
 			}
-			else if (!messageBuffer.empty())
+			else if (!messageBuffer->empty())
 			{
-				auto dataPtr = messageBuffer.front();
-				messageBuffer.pop_front();
+				auto dataPtr = messageBuffer->front();
+				messageBuffer->pop_front();
 
 				const auto data = dataPtr.serialize();
 				size_t bytesWritten = 0;
@@ -216,11 +246,11 @@ private:
 	volatile bool isRunning;
 	std::string pipeId;
 
+	std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> dataBuffer;
+	std::shared_ptr<std::deque<Message>> messageBuffer;
+
 	std::unique_ptr<std::thread> thread;
 	std::timed_mutex mutex;
-
-	std::deque<std::shared_ptr<MF_BASE_TYPE>> dataBuffer;
-	std::deque<Message> messageBuffer;
 };
 
 class MFPipeImpl: public MFPipe
@@ -275,7 +305,17 @@ public:
 
 		if (strHints.find("R") != std::string::npos)
 		{
-
+			readDataBuffer = std::make_shared<std::deque<std::shared_ptr<MF_BASE_TYPE>>>();
+			readMessageBuffer = std::make_shared<std::deque<Message>>();
+			reader = std::make_unique<PipeReader>(pipeId, _nMaxBuffers, readDataBuffer, readMessageBuffer);
+			reader->start();
+		}
+		if (strHints.find("W") != std::string::npos)
+		{
+			writeDataBuffer = std::make_shared<std::deque<std::shared_ptr<MF_BASE_TYPE>>>();
+			writeMessageBuffer = std::make_shared<std::deque<Message>>();
+			writer = std::make_unique<PipeWriter>(pipeId, writeDataBuffer, writeMessageBuffer);
+			writer->start();
 		}
 
 		return S_OK;
@@ -287,29 +327,43 @@ public:
 		/*[in]*/ int _nMaxWaitMs,
 		/*[in]*/ const std::string &strHints) override
 	{
-		time_t startTime = time(nullptr);
-		size_t bytesWritten = 0;
-		const auto data = pBufferOrFrame->serialize();
-
-		std::cout << "Writing " << data.size() << " bytes to pipe" << std::endl;
-
-		while (time(nullptr) < startTime + _nMaxWaitMs && bytesWritten < data.size())
+		if (!writeMutex.try_lock_for(std::chrono::milliseconds(_nMaxWaitMs)))
 		{
-			int32_t fd = open(pipeId.c_str(), O_WRONLY | O_NONBLOCK);
-			if (fd == -1)
-			{
-				usleep(100);
-				continue;
-			}
-
-			auto bytes = write(fd, data.data() + bytesWritten, data.size() - bytesWritten);
-			if (bytes != -1)
-				bytesWritten += bytes;
-
-			close(fd);
+			std::cout << "Failed to add buffer to write queue." << std::endl;
+			return S_FALSE;
 		}
 
-		return bytesWritten == data.size() ? S_OK : S_FALSE;
+		// TODO check buffer size
+
+		writeDataBuffer->push_back(pBufferOrFrame);
+		writeMutex.unlock();
+
+		return S_OK;
+
+
+//		time_t startTime = time(nullptr);
+//		size_t bytesWritten = 0;
+//		const auto data = pBufferOrFrame->serialize();
+
+//		std::cout << "Writing " << data.size() << " bytes to pipe" << std::endl;
+
+//		while (time(nullptr) < startTime + _nMaxWaitMs && bytesWritten < data.size())
+//		{
+//			int32_t fd = open(pipeId.c_str(), O_WRONLY | O_NONBLOCK);
+//			if (fd == -1)
+//			{
+//				usleep(100);
+//				continue;
+//			}
+
+//			auto bytes = write(fd, data.data() + bytesWritten, data.size() - bytesWritten);
+//			if (bytes != -1)
+//				bytesWritten += bytes;
+
+//			close(fd);
+//		}
+
+//		return bytesWritten == data.size() ? S_OK : S_FALSE;
 	}
 
 	HRESULT PipeGet(
@@ -320,57 +374,99 @@ public:
 	{
 		time_t startTime = time(nullptr);
 
-		while (time(nullptr) < startTime + _nMaxWaitMs)
+		while(time(nullptr) < startTime + _nMaxWaitMs)
 		{
-			int32_t fd = open(pipeId.c_str(), O_RDONLY | O_NONBLOCK);
-			if (fd == -1)
+			if (!readMutex.try_lock_for(std::chrono::milliseconds(10)))
+				continue;
+
+			if (readDataBuffer->empty())
 			{
-				std::cout << "Failed to open on read at " << time(nullptr) << std::endl;
-				usleep(100);
+				std::this_thread::sleep_for(std::chrono::milliseconds(10));
 				continue;
 			}
 
-			bool doRead = true;
-			while (doRead)
-			{
-				uint8_t byte;
-				std::vector<uint8_t> data;
-
-				if (read(fd, &byte, sizeof(uint8_t)) == -1)
-				{
-					doRead = false;
-					break;
-				}
-
-				data.push_back(byte);
-				parser.parse(data, 0);
-
-				if (parser.getState() == Parser::State::BUFFER_READY)
-				{
-					const auto data = parser.getData();
-
-					MF_BUFFER buffer;
-					pBufferOrFrame = std::shared_ptr<MF_BASE_TYPE>(buffer.deserialize(data));
-
-					parser.reset();
-
-					return S_OK;
-				}
-				else if (parser.getState() == Parser::State::FRAME_READY)
-				{
-					const auto data = parser.getData();
-
-					MF_FRAME frame;
-					pBufferOrFrame = std::shared_ptr<MF_BASE_TYPE>(frame.deserialize(data));
-
-					parser.reset();
-
-					return S_OK;
-				}
-			}
+			pBufferOrFrame = readDataBuffer->front();
+			readDataBuffer->pop_front();
+			readMutex.unlock();
+			return S_OK;
 		}
 
 		return S_FALSE;
+
+//		if (!readMutex.try_lock_for(std::chrono::milliseconds(_nMaxWaitMs)))
+//		{
+//			std::cout << "Failed to get buffer from read queue" << std::endl;
+//			return S_FALSE;
+//		}
+
+//		if (readDataBuffer->empty())
+//		{
+//			std::cout << "Read queue is empty" << std::endl;
+//			readMutex.unlock();
+//			return S_FALSE;
+//		}
+
+//		pBufferOrFrame = readDataBuffer->front();
+//		readDataBuffer->pop_front();
+//		readMutex.unlock();
+
+//		return S_OK;
+
+		//////////////////
+
+//		time_t startTime = time(nullptr);
+
+//		while (time(nullptr) < startTime + _nMaxWaitMs)
+//		{
+//			int32_t fd = open(pipeId.c_str(), O_RDONLY | O_NONBLOCK);
+//			if (fd == -1)
+//			{
+//				std::cout << "Failed to open on read at " << time(nullptr) << std::endl;
+//				usleep(100);
+//				continue;
+//			}
+
+//			bool doRead = true;
+//			while (doRead)
+//			{
+//				uint8_t byte;
+//				std::vector<uint8_t> data;
+
+//				if (read(fd, &byte, sizeof(uint8_t)) == -1)
+//				{
+//					doRead = false;
+//					break;
+//				}
+
+//				data.push_back(byte);
+//				parser.parse(data, 0);
+
+//				if (parser.getState() == Parser::State::BUFFER_READY)
+//				{
+//					const auto data = parser.getData();
+
+//					MF_BUFFER buffer;
+//					pBufferOrFrame = std::shared_ptr<MF_BASE_TYPE>(buffer.deserialize(data));
+
+//					parser.reset();
+
+//					return S_OK;
+//				}
+//				else if (parser.getState() == Parser::State::FRAME_READY)
+//				{
+//					const auto data = parser.getData();
+
+//					MF_FRAME frame;
+//					pBufferOrFrame = std::shared_ptr<MF_BASE_TYPE>(frame.deserialize(data));
+
+//					parser.reset();
+
+//					return S_OK;
+//				}
+//			}
+//		}
+
+//		return S_FALSE;
 	}
 
 	HRESULT PipePeek(
@@ -432,7 +528,6 @@ public:
 				continue;
 			}
 
-			bool readingEventName = true;
 			bool doRead = true;
 			while (doRead)
 			{
@@ -481,8 +576,16 @@ private:
 	std::string pipeId;
 	MF_PIPE_INFO pipeInfo;
 
-	std::deque<std::shared_ptr<MF_BASE_TYPE>> dataBuffer;
-	std::deque<Message> messageBuffer;
+	std::timed_mutex readMutex;
+	std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> readDataBuffer;
+	std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> writeDataBuffer;
+
+	std::timed_mutex writeMutex;
+	std::shared_ptr<std::deque<Message>> readMessageBuffer;
+	std::shared_ptr<std::deque<Message>> writeMessageBuffer;
+
+	std::unique_ptr<PipeReader> reader;
+	std::unique_ptr<PipeWriter> writer;
 
 	Parser parser;
 };
