@@ -30,3 +30,10 @@
 *.exe
 *.out
 *.app
+
+*/CMakeFiles/*
+*.txt.user
+Makefile
+*.cmake
+/build*/
+*.cbp
