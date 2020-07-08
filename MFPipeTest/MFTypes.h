@@ -1,0 +1,625 @@
+#ifndef MF_TYPES_H_
+#define MF_TYPES_H_
+
+#include <cstdint>
+#include <string>
+#include <vector>
+#include <memory>
+#include <iostream>
+#include <cmath>
+
+typedef long long int REFERENCE_TIME;
+
+typedef	enum HRESULT
+{
+	S_OK = 0,
+	S_FALSE = 1,
+	E_NOTIMPL = 0x80004001L,
+	E_OUTOFMEMORY = 0x8007000EL,
+	E_INVALIDARG = 0x80070057L
+} HRESULT;
+
+enum class DataType
+{
+	NONE = 0x00,
+	FRAME,
+	BUFFER,
+	MESSAGE,
+};
+
+typedef struct M_TIME
+{
+	REFERENCE_TIME rtStartTime;
+	REFERENCE_TIME rtEndTime;
+} 	M_TIME;
+
+bool operator==(const M_TIME &lh, const M_TIME &rh)
+{
+	return lh.rtStartTime == rh.rtStartTime
+			&& lh.rtEndTime == rh.rtEndTime;
+}
+
+bool operator!=(const M_TIME &lh, const M_TIME &rh)
+{
+	return !(lh == rh);
+}
+
+typedef enum eMFCC
+{
+	eMFCC_Default = 0,
+	eMFCC_I420 = 0x30323449,
+	eMFCC_YV12 = 0x32315659,
+	eMFCC_NV12 = 0x3231564e,
+	eMFCC_YUY2 = 0x32595559,
+	eMFCC_YVYU = 0x55595659,
+	eMFCC_UYVY = 0x59565955,
+	eMFCC_RGB24 = 0xe436eb7d,
+	eMFCC_RGB32 = 0xe436eb7e,
+} 	eMFCC;
+
+typedef struct M_VID_PROPS
+{
+	eMFCC fccType;
+	int nWidth;
+	int nHeight;
+	int nRowBytes;
+	short nAspectX;
+	short nAspectY;
+	double dblRate;
+} 	M_VID_PROPS;
+
+bool operator==(const M_VID_PROPS &lh, const M_VID_PROPS &rh)
+{
+	return lh.fccType == rh.fccType
+			&& lh.nWidth == rh.nWidth
+			&& lh.nHeight == rh.nHeight
+			&& lh.nRowBytes == rh.nRowBytes
+			&& lh.nAspectX == rh.nAspectX
+			&& lh.nAspectY == rh.nAspectY
+			&& fabs(lh.dblRate - rh.dblRate) < 0.0001;
+}
+
+bool operator!=(const M_VID_PROPS &lh, const M_VID_PROPS &rh)
+{
+	return !(lh == rh);
+}
+
+typedef struct M_AUD_PROPS
+{
+	int nChannels;
+	int nSamplesPerSec;
+	int nBitsPerSample;
+	int nTrackSplitBits;
+} 	M_AUD_PROPS;
+
+bool operator==(const M_AUD_PROPS &lh, const M_AUD_PROPS &rh)
+{
+	return lh.nChannels == rh.nChannels
+			&& lh.nSamplesPerSec == rh.nSamplesPerSec
+			&& lh.nBitsPerSample == rh.nBitsPerSample
+			&& lh.nTrackSplitBits == rh.nTrackSplitBits;
+}
+
+bool operator!=(const M_AUD_PROPS &lh, const M_AUD_PROPS &rh)
+{
+	return !(lh == rh);
+}
+
+typedef struct M_AV_PROPS
+{
+	M_VID_PROPS vidProps;
+	M_AUD_PROPS audProps;
+} 	M_AV_PROPS;
+
+bool operator==(const M_AV_PROPS &lh, const M_AV_PROPS &rh)
+{
+	return lh.vidProps == rh.vidProps
+			&& lh.audProps == rh.audProps;
+}
+
+bool operator!=(const M_AV_PROPS &lh, const M_AV_PROPS &rh)
+{
+	return !(lh == rh);
+}
+
+typedef struct MF_BASE_TYPE
+{
+	virtual ~MF_BASE_TYPE() {}
+
+	virtual std::vector<uint8_t> serialize() const = 0;
+	virtual MF_BASE_TYPE* deserialize(const std::vector<uint8_t> &raw) = 0;
+} MF_BASE_TYPE;
+
+typedef struct MF_FRAME: public MF_BASE_TYPE
+{
+	typedef std::shared_ptr<MF_FRAME> TPtr;
+
+	M_TIME      time = {};
+	M_AV_PROPS    av_props = {};
+	std::string    str_user_props;
+	std::vector<uint8_t> vec_video_data;
+	std::vector<uint8_t> vec_audio_data;
+
+	std::vector<uint8_t> serialize() const override
+	{
+		std::vector<uint8_t> buf;
+
+		auto to_bytes = [&buf](auto data) {
+			const auto bytes = reinterpret_cast<const uint8_t *>(&data);
+			buf.insert(buf.end(), bytes, bytes + sizeof(data));
+		};
+
+		to_bytes(static_cast<uint8_t>(DataType::FRAME));
+		to_bytes(time);
+		to_bytes(av_props);
+
+		to_bytes(str_user_props.size());
+		buf.insert(buf.end(), str_user_props.begin(), str_user_props.end());
+
+		to_bytes(vec_video_data.size());
+		buf.insert(buf.end(), vec_video_data.begin(), vec_video_data.end());
+
+		to_bytes(vec_audio_data.size());
+		buf.insert(buf.end(), vec_audio_data.begin(), vec_audio_data.end());
+
+		return buf;
+	}
+
+	MF_BASE_TYPE* deserialize(const std::vector<uint8_t> &raw) override
+	{
+		auto frame = new MF_FRAME();
+
+		auto rawPtr = raw.data();
+
+		frame->time = *reinterpret_cast<const M_TIME *>(rawPtr);
+		rawPtr += sizeof(frame->time);
+
+		frame->av_props = *reinterpret_cast<const M_AV_PROPS *>(rawPtr);
+		rawPtr += sizeof(frame->av_props);
+
+		auto str_user_props_size = *reinterpret_cast<const size_t *>(rawPtr);
+		rawPtr += sizeof(str_user_props_size);
+		frame->str_user_props = std::string(reinterpret_cast<const char *>(rawPtr), str_user_props_size);
+		rawPtr += str_user_props_size;
+
+		auto vec_video_data_size = *reinterpret_cast<const size_t *>(rawPtr);
+		rawPtr += sizeof(vec_video_data_size);
+		frame->vec_video_data = std::vector<uint8_t>(rawPtr, rawPtr + vec_video_data_size);
+		rawPtr += vec_video_data_size;
+
+		auto vec_audio_data_size = *reinterpret_cast<const size_t *>(rawPtr);
+		rawPtr += sizeof(vec_audio_data_size);
+		frame->vec_audio_data = std::vector<uint8_t>(rawPtr, rawPtr + vec_audio_data_size);
+		rawPtr += sizeof(vec_audio_data_size);
+
+		return frame;
+	}
+} MF_FRAME;
+
+bool operator==(const MF_FRAME &lh, const MF_FRAME &rh)
+{
+	return lh.time == rh.time
+			&& lh.av_props == rh.av_props
+			&& lh.str_user_props == rh.str_user_props
+			&& lh.vec_video_data == rh.vec_video_data
+			&& lh.vec_audio_data == rh.vec_audio_data;
+}
+
+bool operator!=(const MF_FRAME &lh, const MF_FRAME &rh)
+{
+	return !(lh == rh);
+}
+
+typedef enum eMFBufferFlags
+{
+	eMFBF_Empty = 0,
+	eMFBF_Buffer = 0x1,
+	eMFBF_Packet = 0x2,
+	eMFBF_Frame = 0x3,
+	eMFBF_Stream = 0x4,
+	eMFBF_SideData = 0x10,
+	eMFBF_VideoData = 0x20,
+	eMFBF_AudioData = 0x40,
+} 	eMFBufferFlags;
+
+typedef struct MF_BUFFER: public MF_BASE_TYPE
+{
+	typedef std::shared_ptr<MF_BUFFER> TPtr;
+
+	eMFBufferFlags       flags;
+	std::vector<uint8_t> data;
+
+	std::vector<uint8_t> serialize() const override
+	{
+		std::vector<uint8_t> buf;
+
+		auto to_bytes = [&buf](auto data) {
+			const auto bytes = reinterpret_cast<const uint8_t *>(&data);
+			buf.insert(buf.end(), bytes, bytes + sizeof(data));
+		};
+
+		to_bytes(static_cast<uint8_t>(DataType::BUFFER));
+		to_bytes(flags);
+
+		to_bytes(data.size());
+		buf.insert(buf.end(), data.begin(), data.end());
+
+		return buf;
+	}
+
+	MF_BASE_TYPE* deserialize(const std::vector<uint8_t> &raw) override
+	{
+		auto buffer = new MF_BUFFER();
+
+		auto rawPtr = raw.data();
+
+		buffer->flags = *reinterpret_cast<const eMFBufferFlags *>(rawPtr);
+		rawPtr += sizeof(buffer->flags);
+
+		auto data_size = *reinterpret_cast<const size_t *>(rawPtr);
+		rawPtr += sizeof(data_size);
+		buffer->data = std::vector<uint8_t>(rawPtr, rawPtr + data_size);
+		rawPtr += data_size;
+
+		return buffer;
+	}
+} MF_BUFFER;
+
+bool operator==(const MF_BUFFER &lh, const MF_BUFFER &rh)
+{
+	return lh.flags == rh.flags
+			&& lh.data == rh.data;
+}
+
+bool operator!=(const MF_BUFFER &lh, const MF_BUFFER &rh)
+{
+	return !(lh == rh);
+}
+
+struct Message
+{
+	std::string name;
+	std::string param;
+
+	std::vector<uint8_t> serialize() const
+	{
+		std::vector<uint8_t> buf;
+
+		auto to_bytes = [&buf](auto data) {
+			const auto bytes = reinterpret_cast<const uint8_t *>(&data);
+			buf.insert(buf.end(), bytes, bytes + sizeof(data));
+		};
+
+		to_bytes(static_cast<uint8_t>(DataType::MESSAGE));
+
+		to_bytes(name.size());
+		buf.insert(buf.end(), name.begin(), name.end());
+
+		to_bytes(param.size());
+		buf.insert(buf.end(), param.begin(), param.end());
+
+		return buf;
+	}
+
+	Message deserialize(const std::vector<uint8_t> &raw)
+	{
+		Message mes;
+
+		auto rawPtr = raw.data();
+
+		auto nameSize = *reinterpret_cast<const size_t *>(rawPtr);
+		rawPtr += sizeof(size_t);
+		mes.name = std::string(reinterpret_cast<const char *>(rawPtr), nameSize);
+		rawPtr += nameSize;
+
+		auto paramSize = *reinterpret_cast<const size_t *>(rawPtr);
+		rawPtr += sizeof(size_t);
+		mes.param = std::string(reinterpret_cast<const char *>(rawPtr), paramSize);
+		rawPtr += paramSize;
+
+		return mes;
+	}
+};
+
+class Parser
+{
+public:
+	enum class State
+	{
+		IDLE = 0x00,
+
+		FRAME_TIME,
+		FRAME_AV_PROPS,
+		FRAME_USER_PROPS_SIZE,
+		FRAME_USER_PROPS,
+		FRAME_VIDEO_DATA_SIZE,
+		FRAME_VIDEO_DATA,
+		FRAME_AUDIO_DATA_SIZE,
+		FRAME_AUDIO_DATA,
+		FRAME_READY,
+
+		BUFFER_FLAGS,
+		BUFFER_DATA_SIZE,
+		BUFFER_DATA,
+		BUFFER_READY,
+
+		MESSAGE_EVENT_NAME_SIZE,
+		MESSAGE_EVENT_NAME,
+		MESSAGE_EVENT_PARAM_SIZE,
+		MESSAGE_EVENT_PARAM,
+		MESSAGE_READY,
+
+		DONE,
+	};
+
+	Parser()
+	{
+		reset();
+	}
+
+	void reset()
+	{
+		state = State::IDLE;
+		type = DataType::NONE;
+		chunkSize = 0;
+		data.clear();
+	}
+
+	const std::vector<uint8_t> getData() const
+	{
+		return data;
+	}
+
+	State getState() const
+	{
+		return state;
+	}
+
+	size_t parse(const std::vector<uint8_t> &rawData, size_t startPos)
+	{
+		size_t pos = startPos;
+
+		while (pos < rawData.size())
+		{
+			const uint8_t byte = rawData.at(pos++);
+
+			switch (state)
+			{
+				case State::IDLE:
+				{
+					switch (static_cast<DataType>(byte))
+					{
+						case DataType::FRAME:
+							type = DataType::FRAME;
+							state = State::FRAME_TIME;
+							chunkSize = sizeof(M_TIME);
+							std::cout << "PARSER: Frame" << std::endl;
+							break;
+						case DataType::BUFFER:
+							type = DataType::BUFFER;
+							state = State::BUFFER_FLAGS;
+							chunkSize = sizeof(eMFBufferFlags);
+							std::cout << "PARSER: Buffer" << std::endl;
+							break;
+						case DataType::MESSAGE:
+							type = DataType::MESSAGE;
+							state = State::MESSAGE_EVENT_NAME_SIZE;
+							chunkSize = sizeof(size_t);
+							std::cout << "PARSER: Message" << std::endl;
+							break;
+						default:
+							type = DataType::NONE;
+							state = State::IDLE;
+							break;
+					}
+
+					break;
+				}
+
+				case State::FRAME_TIME:
+				{
+					data.push_back(byte);
+					chunkSize--;
+					if (chunkSize == 0)
+					{
+						state = State::FRAME_AV_PROPS;
+						chunkSize = sizeof(M_AV_PROPS);
+						std::cout << "PARSER: Frame: Time read." << std::endl;
+					}
+					break;
+				}
+
+				case State::FRAME_AV_PROPS:
+				{
+					data.push_back(byte);
+					chunkSize--;
+					if (chunkSize == 0)
+					{
+						state = State::FRAME_USER_PROPS_SIZE;
+						chunkSize = sizeof(size_t);
+						std::cout << "PARSER: Frame: AV props read." << std::endl;
+					}
+					break;
+				}
+
+				case State::FRAME_USER_PROPS_SIZE:
+				{
+					data.push_back(byte);
+					chunkSize--;
+					if (chunkSize == 0)
+					{
+						state = State::FRAME_USER_PROPS;
+						chunkSize = *reinterpret_cast<const size_t *>(data.data() + data.size() - sizeof(size_t));
+						std::cout << "PARSER: Frame: User props size " << chunkSize << std::endl;
+					}
+					break;
+				}
+
+				case State::FRAME_USER_PROPS:
+				{
+					data.push_back(byte);
+					chunkSize--;
+					if (chunkSize == 0)
+					{
+						state = State::FRAME_VIDEO_DATA_SIZE;
+						chunkSize = sizeof(size_t);
+						std::cout << "PARSER: Frame: User props read." << std::endl;
+					}
+					break;
+				}
+
+				case State::FRAME_VIDEO_DATA_SIZE:
+				{
+					data.push_back(byte);
+					chunkSize--;
+					if (chunkSize == 0)
+					{
+						state = State::FRAME_VIDEO_DATA;
+						chunkSize = *reinterpret_cast<const size_t *>(data.data() + data.size() - sizeof(size_t));
+						std::cout << "PARSER: Frame: Video data size " << chunkSize << std::endl;
+					}
+					break;
+				}
+
+				case State::FRAME_VIDEO_DATA:
+				{
+					data.push_back(byte);
+					chunkSize--;
+					if (chunkSize == 0)
+					{
+						state = State::FRAME_AUDIO_DATA_SIZE;
+						chunkSize = sizeof(size_t);
+						std::cout << "PARSER: Frame: Video data read." << std::endl;
+					}
+					break;
+				}
+
+				case State::FRAME_AUDIO_DATA_SIZE:
+				{
+					data.push_back(byte);
+					chunkSize--;
+					if (chunkSize == 0)
+					{
+						state = State::FRAME_AUDIO_DATA;
+						chunkSize = *reinterpret_cast<const size_t *>(data.data() + data.size() - sizeof(size_t));
+						std::cout << "PARSER: Frame: Audio data size " << chunkSize << std::endl;
+					}
+					break;
+				}
+
+				case State::FRAME_AUDIO_DATA:
+				{
+					data.push_back(byte);
+					chunkSize--;
+					if (chunkSize == 0)
+					{
+						state = State::FRAME_READY;
+						return pos;
+					}
+					break;
+				}
+
+				case State::BUFFER_FLAGS:
+				{
+					data.push_back(byte);
+					chunkSize--;
+					if (chunkSize == 0)
+					{
+						state = State::BUFFER_DATA_SIZE;
+						chunkSize = sizeof(size_t);
+						std::cout << "PARSER: Read buffer flags." << std::endl;
+					}
+					break;
+				}
+
+				case State::BUFFER_DATA_SIZE:
+				{
+					data.push_back(byte);
+					chunkSize--;
+					if (chunkSize == 0)
+					{
+						state = State::BUFFER_DATA;
+						chunkSize = *reinterpret_cast<const size_t *>(data.data() + data.size() - sizeof(size_t));
+						std::cout << "PARSER: Buffer data size: " << chunkSize << std::endl;
+					}
+					break;
+				}
+
+				case State::BUFFER_DATA:
+				{
+					data.push_back(byte);
+					chunkSize--;
+					if (chunkSize == 0)
+					{
+						state = State::BUFFER_READY;
+						return pos;
+					}
+					break;
+				}
+
+				case State::MESSAGE_EVENT_NAME_SIZE:
+				{
+					data.push_back(byte);
+					chunkSize--;
+					if (chunkSize == 0)
+					{
+						state = State::MESSAGE_EVENT_NAME;
+						chunkSize = *reinterpret_cast<const size_t *>(data.data() + data.size() - sizeof(size_t));
+						std::cout << "PARSER: Message event name size: " << chunkSize << std::endl;
+					}
+					break;
+				}
+
+				case State::MESSAGE_EVENT_NAME:
+				{
+					data.push_back(byte);
+					chunkSize--;
+					if (chunkSize == 0)
+					{
+						state = State::MESSAGE_EVENT_PARAM_SIZE;
+						chunkSize = sizeof(size_t);
+						std::cout << "PARSER: Message event name read" << std::endl;
+					}
+					break;
+				}
+
+				case State::MESSAGE_EVENT_PARAM_SIZE:
+				{
+					data.push_back(byte);
+					chunkSize--;
+					if (chunkSize == 0)
+					{
+						state = State::MESSAGE_EVENT_PARAM;
+						chunkSize = *reinterpret_cast<const size_t *>(data.data() + data.size() - sizeof(size_t));
+						std::cout << "PARSER: Message event param size " << chunkSize << std::endl;
+					}
+					break;
+				}
+
+				case State::MESSAGE_EVENT_PARAM:
+				{
+					data.push_back(byte);
+					chunkSize--;
+					if (chunkSize == 0)
+					{
+						state = State::MESSAGE_READY;
+						return pos;
+					}
+				}
+
+				default:
+					return pos;
+			}
+		}
+
+		return rawData.size();
+	}
+
+private:
+	State state;
+	DataType type;
+	size_t chunkSize;
+	std::vector<uint8_t> data;
+};
+
+#endif
