@@ -1,6 +1,7 @@
 #include "MFPipeImpl.h"
 #include <iostream>
 #include <cmath>
+#include <future>
 
 #define PACKETS_COUNT	(8)
 
@@ -77,7 +78,7 @@ bool testBuffer(bool read)
 		{
 			for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
 			{
-				auto res = writePipe.PipePut("", arrBuffersIn[i], 1000, "");
+				auto res = writePipe.PipePut("", arrBuffersIn[i], 10000, "");
 				std::cout << "Write " << i << " res " << res << std::endl;
 
 				if (res != S_OK)
@@ -90,7 +91,7 @@ bool testBuffer(bool read)
 		}
 		else
 		{
-			std::cout << "Faailed to create pipe." << std::endl;
+			std::cout << "Failed to create pipe." << std::endl;
 			testRes = false;
 		}
 
@@ -104,7 +105,7 @@ bool testBuffer(bool read)
 		for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
 		{
 			std::shared_ptr<MF_BASE_TYPE> buf;
-			auto res = readPipe.PipeGet("", buf, 1000, "");
+			auto res = readPipe.PipeGet("", buf, 10000, "");
 			std::cout << "Read " << i << " res " << res << std::endl;
 
 			const auto dp = dynamic_cast<MF_BUFFER *>(arrBuffersIn[i].get());
@@ -121,6 +122,92 @@ bool testBuffer(bool read)
 	}
 
 	return testRes;
+}
+
+bool testBufferMultithreadedWrite(std::shared_ptr<MF_BUFFER> *buffers, size_t size)
+{
+	std::cout << "WRITE" << std::endl;
+
+	bool testRes = true;
+
+	MFPipeImpl writePipe;
+	if (writePipe.PipeCreate(testPipeName, "") == S_OK)
+	{
+		for (size_t i = 0; i < size; ++i)
+		{
+			auto res = writePipe.PipePut("", buffers[i], 1000, "");
+			std::cout << "Write " << i << " res " << res << std::endl;
+
+			if (res != S_OK)
+			{
+				std::cout << "Failed to write into pipe" << std::endl;
+				testRes = false;
+				break;
+			}
+		}
+	}
+	else
+	{
+		std::cout << "Failed to create pipe." << std::endl;
+		testRes = false;
+	}
+
+	writePipe.PipeClose();
+
+	return testRes;
+}
+
+bool testBufferMultithreadedRead(std::shared_ptr<MF_BUFFER> *buffers, size_t size)
+{
+	std::cout << "READ" << std::endl;
+
+	bool testRes = true;
+
+	MFPipeImpl readPipe;
+	readPipe.PipeOpen(testPipeName, 0, "");
+
+	for (size_t i = 0; i < size; ++i)
+	{
+		std::shared_ptr<MF_BASE_TYPE> buf;
+		auto res = readPipe.PipeGet("", buf, 1000, "");
+		std::cout << "Read " << i << " res " << res << std::endl;
+
+		const auto dp = dynamic_cast<MF_BUFFER *>(buffers[i].get());
+		const auto bp = dynamic_cast<MF_BUFFER *>(buf.get());
+
+		if (*dp != *bp)
+		{
+			std::cout << "Read invalid data." << std::endl;
+			testRes = false;
+		}
+	}
+
+	readPipe.PipeClose();
+
+	return testRes;
+}
+
+bool testBufferMultithreaded()
+{
+	std::shared_ptr<MF_BUFFER> arrBuffersIn[PACKETS_COUNT];
+	for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
+	{
+		size_t cbSize = 128 * 1024 + rand() % (256 * 1024);
+		arrBuffersIn[i] = std::make_shared<MF_BUFFER>();
+
+		arrBuffersIn[i]->flags = eMFBF_Buffer;
+		// Fill buffer
+		// TODO: fill by test data here
+
+		for (size_t j = 0; j < cbSize; ++j) {
+			arrBuffersIn[i]->data.push_back(j);
+		}
+	}
+
+	auto writeFut = std::async(&testBufferMultithreadedWrite, arrBuffersIn, SIZEOF_ARRAY(arrBuffersIn));
+	auto readFut = std::async(&testBufferMultithreadedRead, arrBuffersIn, SIZEOF_ARRAY(arrBuffersIn));
+
+	return writeFut.get() && readFut.get();
 }
 
 bool testFrame(bool read)
@@ -312,13 +399,31 @@ bool testAll(bool read)
 			std::cout << "Write " << i << std::endl;
 
 			// Write to pipe
-			MFPipe_Write.PipePut("ch1", arrBuffersIn[i % PACKETS_COUNT], 100, "");
-			MFPipe_Write.PipePut("ch2", arrBuffersIn[(i + 1) % PACKETS_COUNT], 100, "");
-			MFPipe_Write.PipeMessagePut("ch1", pstrEvents[i % PACKETS_COUNT], pstrMessages[i % PACKETS_COUNT], 100);
-			MFPipe_Write.PipeMessagePut("ch2", pstrEvents[(i + 1) % PACKETS_COUNT], pstrMessages[(i + 1) % PACKETS_COUNT], 100);
+			{
+				auto res = MFPipe_Write.PipePut("ch1", arrBuffersIn[i % PACKETS_COUNT], 1000, "");
+				std::cout << "Write " << i << " " << res << std::endl;
+			}
+			{
+				auto res = MFPipe_Write.PipePut("ch2", arrBuffersIn[(i + 1) % PACKETS_COUNT], 1000, "");
+				std::cout << "Write " << i << " " << res << std::endl;
+			}
+			{
+				auto res = MFPipe_Write.PipeMessagePut("ch1", pstrEvents[i % PACKETS_COUNT], pstrMessages[i % PACKETS_COUNT], 1000);
+				std::cout << "Write " << i << " " << res << std::endl;
+			}
+			{
+				auto res = MFPipe_Write.PipeMessagePut("ch2", pstrEvents[(i + 1) % PACKETS_COUNT], pstrMessages[(i + 1) % PACKETS_COUNT], 1000);
+				std::cout << "Write " << i << " " << res << std::endl;
+			}
 
-			MFPipe_Write.PipePut("ch1", arrBuffersIn[i % PACKETS_COUNT], 100, "");
-			MFPipe_Write.PipePut("ch2", arrBuffersIn[(i + 1) % PACKETS_COUNT], 100, "");
+			{
+				auto res = MFPipe_Write.PipePut("ch1", arrBuffersIn[i % PACKETS_COUNT], 1000, "");
+				std::cout << "Write " << i << " " << res << std::endl;
+			}
+			{
+				auto res = MFPipe_Write.PipePut("ch2", arrBuffersIn[(i + 1) % PACKETS_COUNT], 1000, "");
+				std::cout << "Write " << i << " " << res << std::endl;
+			}
 
 			std::string strPipeName;
 			MFPipe_Write.PipeInfoGet(&strPipeName, "", NULL);
@@ -342,15 +447,15 @@ bool testAll(bool read)
 			std::string arrStrings[4];
 
 			std::shared_ptr<MF_BASE_TYPE> arrBuffersOut[8];
-			MFPipe_Read.PipeGet("ch1", arrBuffersOut[0], 100, "");
-			MFPipe_Read.PipeGet("ch2", arrBuffersOut[1], 100, "");
+			MFPipe_Read.PipeGet("ch1", arrBuffersOut[0], 1000, "");
+			MFPipe_Read.PipeGet("ch2", arrBuffersOut[1], 1000, "");
 
-			MFPipe_Read.PipeMessageGet("ch1", &arrStrings[0], &arrStrings[1], 100);
-			MFPipe_Read.PipeMessageGet("ch2", &arrStrings[2], &arrStrings[3], 100);
+			MFPipe_Read.PipeMessageGet("ch1", &arrStrings[0], &arrStrings[1], 1000);
+			MFPipe_Read.PipeMessageGet("ch2", &arrStrings[2], &arrStrings[3], 1000);
 			//		MFPipe_Read.PipeMessageGet("ch2", NULL, &arrStrings[2], 100);
 
-			MFPipe_Read.PipeGet("ch1", arrBuffersOut[2], 100, "");
-			MFPipe_Read.PipeGet("ch2", arrBuffersOut[3], 100, "");
+			MFPipe_Read.PipeGet("ch1", arrBuffersOut[2], 1000, "");
+			MFPipe_Read.PipeGet("ch2", arrBuffersOut[3], 1000, "");
 			//		MFPipe_Read.PipeGet("ch2", arrBuffersOut[6], 100, "");
 
 			// TODO: Your test code here
@@ -664,6 +769,11 @@ int main(int argc, char *argv[])
 	{
 		bool res = testBuffer(false);
 		std::cout << "Buffer write: " << bool_to_str(res) << std::endl;
+	}
+
+	{
+		bool res = testBufferMultithreaded();
+		std::cout << "Buffer multithreaded: " << bool_to_str(res) << std::endl;
 	}
 
 	if (argc > 1)
