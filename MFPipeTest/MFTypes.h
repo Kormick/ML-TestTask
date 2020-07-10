@@ -33,13 +33,13 @@ typedef struct M_TIME
 	REFERENCE_TIME rtEndTime;
 } 	M_TIME;
 
-bool operator==(const M_TIME &lh, const M_TIME &rh)
+inline bool operator==(const M_TIME &lh, const M_TIME &rh)
 {
 	return lh.rtStartTime == rh.rtStartTime
 			&& lh.rtEndTime == rh.rtEndTime;
 }
 
-bool operator!=(const M_TIME &lh, const M_TIME &rh)
+inline bool operator!=(const M_TIME &lh, const M_TIME &rh)
 {
 	return !(lh == rh);
 }
@@ -68,7 +68,7 @@ typedef struct M_VID_PROPS
 	double dblRate;
 } 	M_VID_PROPS;
 
-bool operator==(const M_VID_PROPS &lh, const M_VID_PROPS &rh)
+inline bool operator==(const M_VID_PROPS &lh, const M_VID_PROPS &rh)
 {
 	return lh.fccType == rh.fccType
 			&& lh.nWidth == rh.nWidth
@@ -79,7 +79,7 @@ bool operator==(const M_VID_PROPS &lh, const M_VID_PROPS &rh)
 			&& fabs(lh.dblRate - rh.dblRate) < 0.0001;
 }
 
-bool operator!=(const M_VID_PROPS &lh, const M_VID_PROPS &rh)
+inline bool operator!=(const M_VID_PROPS &lh, const M_VID_PROPS &rh)
 {
 	return !(lh == rh);
 }
@@ -92,7 +92,7 @@ typedef struct M_AUD_PROPS
 	int nTrackSplitBits;
 } 	M_AUD_PROPS;
 
-bool operator==(const M_AUD_PROPS &lh, const M_AUD_PROPS &rh)
+inline bool operator==(const M_AUD_PROPS &lh, const M_AUD_PROPS &rh)
 {
 	return lh.nChannels == rh.nChannels
 			&& lh.nSamplesPerSec == rh.nSamplesPerSec
@@ -100,7 +100,7 @@ bool operator==(const M_AUD_PROPS &lh, const M_AUD_PROPS &rh)
 			&& lh.nTrackSplitBits == rh.nTrackSplitBits;
 }
 
-bool operator!=(const M_AUD_PROPS &lh, const M_AUD_PROPS &rh)
+inline bool operator!=(const M_AUD_PROPS &lh, const M_AUD_PROPS &rh)
 {
 	return !(lh == rh);
 }
@@ -111,13 +111,13 @@ typedef struct M_AV_PROPS
 	M_AUD_PROPS audProps;
 } 	M_AV_PROPS;
 
-bool operator==(const M_AV_PROPS &lh, const M_AV_PROPS &rh)
+inline bool operator==(const M_AV_PROPS &lh, const M_AV_PROPS &rh)
 {
 	return lh.vidProps == rh.vidProps
 			&& lh.audProps == rh.audProps;
 }
 
-bool operator!=(const M_AV_PROPS &lh, const M_AV_PROPS &rh)
+inline bool operator!=(const M_AV_PROPS &lh, const M_AV_PROPS &rh)
 {
 	return !(lh == rh);
 }
@@ -196,7 +196,7 @@ typedef struct MF_FRAME: public MF_BASE_TYPE
 	}
 } MF_FRAME;
 
-bool operator==(const MF_FRAME &lh, const MF_FRAME &rh)
+inline bool operator==(const MF_FRAME &lh, const MF_FRAME &rh)
 {
 	return lh.time == rh.time
 			&& lh.av_props == rh.av_props
@@ -205,7 +205,7 @@ bool operator==(const MF_FRAME &lh, const MF_FRAME &rh)
 			&& lh.vec_audio_data == rh.vec_audio_data;
 }
 
-bool operator!=(const MF_FRAME &lh, const MF_FRAME &rh)
+inline bool operator!=(const MF_FRAME &lh, const MF_FRAME &rh)
 {
 	return !(lh == rh);
 }
@@ -265,13 +265,13 @@ typedef struct MF_BUFFER: public MF_BASE_TYPE
 	}
 } MF_BUFFER;
 
-bool operator==(const MF_BUFFER &lh, const MF_BUFFER &rh)
+inline bool operator==(const MF_BUFFER &lh, const MF_BUFFER &rh)
 {
 	return lh.flags == rh.flags
 			&& lh.data == rh.data;
 }
 
-bool operator!=(const MF_BUFFER &lh, const MF_BUFFER &rh)
+inline bool operator!=(const MF_BUFFER &lh, const MF_BUFFER &rh)
 {
 	return !(lh == rh);
 }
@@ -319,307 +319,6 @@ struct Message
 
 		return mes;
 	}
-};
-
-class Parser
-{
-public:
-	enum class State
-	{
-		IDLE = 0x00,
-
-		FRAME_TIME,
-		FRAME_AV_PROPS,
-		FRAME_USER_PROPS_SIZE,
-		FRAME_USER_PROPS,
-		FRAME_VIDEO_DATA_SIZE,
-		FRAME_VIDEO_DATA,
-		FRAME_AUDIO_DATA_SIZE,
-		FRAME_AUDIO_DATA,
-		FRAME_READY,
-
-		BUFFER_FLAGS,
-		BUFFER_DATA_SIZE,
-		BUFFER_DATA,
-		BUFFER_READY,
-
-		MESSAGE_EVENT_NAME_SIZE,
-		MESSAGE_EVENT_NAME,
-		MESSAGE_EVENT_PARAM_SIZE,
-		MESSAGE_EVENT_PARAM,
-		MESSAGE_READY,
-
-		DONE,
-	};
-
-	Parser()
-	{
-		reset();
-	}
-
-	void reset()
-	{
-		state = State::IDLE;
-		type = DataType::NONE;
-		chunkSize = 0;
-		data.clear();
-	}
-
-	const std::vector<uint8_t> getData() const
-	{
-		return data;
-	}
-
-	State getState() const
-	{
-		return state;
-	}
-
-	size_t parse(const std::vector<uint8_t> &rawData, size_t startPos)
-	{
-		size_t pos = startPos;
-
-		while (pos < rawData.size())
-		{
-			const uint8_t byte = rawData.at(pos++);
-
-			switch (state)
-			{
-				case State::IDLE:
-				{
-					switch (static_cast<DataType>(byte))
-					{
-						case DataType::FRAME:
-							type = DataType::FRAME;
-							state = State::FRAME_TIME;
-							chunkSize = sizeof(M_TIME);
-							std::cout << "PARSER: Frame" << std::endl;
-							break;
-						case DataType::BUFFER:
-							type = DataType::BUFFER;
-							state = State::BUFFER_FLAGS;
-							chunkSize = sizeof(eMFBufferFlags);
-							std::cout << "PARSER: Buffer" << std::endl;
-							break;
-						case DataType::MESSAGE:
-							type = DataType::MESSAGE;
-							state = State::MESSAGE_EVENT_NAME_SIZE;
-							chunkSize = sizeof(size_t);
-							std::cout << "PARSER: Message" << std::endl;
-							break;
-						default:
-							type = DataType::NONE;
-							state = State::IDLE;
-							break;
-					}
-
-					break;
-				}
-
-				case State::FRAME_TIME:
-				{
-					data.push_back(byte);
-					chunkSize--;
-					if (chunkSize == 0)
-					{
-						state = State::FRAME_AV_PROPS;
-						chunkSize = sizeof(M_AV_PROPS);
-						std::cout << "PARSER: Frame: Time read." << std::endl;
-					}
-					break;
-				}
-
-				case State::FRAME_AV_PROPS:
-				{
-					data.push_back(byte);
-					chunkSize--;
-					if (chunkSize == 0)
-					{
-						state = State::FRAME_USER_PROPS_SIZE;
-						chunkSize = sizeof(size_t);
-						std::cout << "PARSER: Frame: AV props read." << std::endl;
-					}
-					break;
-				}
-
-				case State::FRAME_USER_PROPS_SIZE:
-				{
-					data.push_back(byte);
-					chunkSize--;
-					if (chunkSize == 0)
-					{
-						state = State::FRAME_USER_PROPS;
-						chunkSize = *reinterpret_cast<const size_t *>(data.data() + data.size() - sizeof(size_t));
-						std::cout << "PARSER: Frame: User props size " << chunkSize << std::endl;
-					}
-					break;
-				}
-
-				case State::FRAME_USER_PROPS:
-				{
-					data.push_back(byte);
-					chunkSize--;
-					if (chunkSize == 0)
-					{
-						state = State::FRAME_VIDEO_DATA_SIZE;
-						chunkSize = sizeof(size_t);
-						std::cout << "PARSER: Frame: User props read." << std::endl;
-					}
-					break;
-				}
-
-				case State::FRAME_VIDEO_DATA_SIZE:
-				{
-					data.push_back(byte);
-					chunkSize--;
-					if (chunkSize == 0)
-					{
-						state = State::FRAME_VIDEO_DATA;
-						chunkSize = *reinterpret_cast<const size_t *>(data.data() + data.size() - sizeof(size_t));
-						std::cout << "PARSER: Frame: Video data size " << chunkSize << std::endl;
-					}
-					break;
-				}
-
-				case State::FRAME_VIDEO_DATA:
-				{
-					data.push_back(byte);
-					chunkSize--;
-					if (chunkSize == 0)
-					{
-						state = State::FRAME_AUDIO_DATA_SIZE;
-						chunkSize = sizeof(size_t);
-						std::cout << "PARSER: Frame: Video data read." << std::endl;
-					}
-					break;
-				}
-
-				case State::FRAME_AUDIO_DATA_SIZE:
-				{
-					data.push_back(byte);
-					chunkSize--;
-					if (chunkSize == 0)
-					{
-						state = State::FRAME_AUDIO_DATA;
-						chunkSize = *reinterpret_cast<const size_t *>(data.data() + data.size() - sizeof(size_t));
-						std::cout << "PARSER: Frame: Audio data size " << chunkSize << std::endl;
-					}
-					break;
-				}
-
-				case State::FRAME_AUDIO_DATA:
-				{
-					data.push_back(byte);
-					chunkSize--;
-					if (chunkSize == 0)
-					{
-						state = State::FRAME_READY;
-						return pos;
-					}
-					break;
-				}
-
-				case State::BUFFER_FLAGS:
-				{
-					data.push_back(byte);
-					chunkSize--;
-					if (chunkSize == 0)
-					{
-						state = State::BUFFER_DATA_SIZE;
-						chunkSize = sizeof(size_t);
-						std::cout << "PARSER: Read buffer flags." << std::endl;
-					}
-					break;
-				}
-
-				case State::BUFFER_DATA_SIZE:
-				{
-					data.push_back(byte);
-					chunkSize--;
-					if (chunkSize == 0)
-					{
-						state = State::BUFFER_DATA;
-						chunkSize = *reinterpret_cast<const size_t *>(data.data() + data.size() - sizeof(size_t));
-						std::cout << "PARSER: Buffer data size: " << chunkSize << std::endl;
-					}
-					break;
-				}
-
-				case State::BUFFER_DATA:
-				{
-					data.push_back(byte);
-					chunkSize--;
-					if (chunkSize == 0)
-					{
-						state = State::BUFFER_READY;
-						return pos;
-					}
-					break;
-				}
-
-				case State::MESSAGE_EVENT_NAME_SIZE:
-				{
-					data.push_back(byte);
-					chunkSize--;
-					if (chunkSize == 0)
-					{
-						state = State::MESSAGE_EVENT_NAME;
-						chunkSize = *reinterpret_cast<const size_t *>(data.data() + data.size() - sizeof(size_t));
-						std::cout << "PARSER: Message event name size: " << chunkSize << std::endl;
-					}
-					break;
-				}
-
-				case State::MESSAGE_EVENT_NAME:
-				{
-					data.push_back(byte);
-					chunkSize--;
-					if (chunkSize == 0)
-					{
-						state = State::MESSAGE_EVENT_PARAM_SIZE;
-						chunkSize = sizeof(size_t);
-						std::cout << "PARSER: Message event name read" << std::endl;
-					}
-					break;
-				}
-
-				case State::MESSAGE_EVENT_PARAM_SIZE:
-				{
-					data.push_back(byte);
-					chunkSize--;
-					if (chunkSize == 0)
-					{
-						state = State::MESSAGE_EVENT_PARAM;
-						chunkSize = *reinterpret_cast<const size_t *>(data.data() + data.size() - sizeof(size_t));
-						std::cout << "PARSER: Message event param size " << chunkSize << std::endl;
-					}
-					break;
-				}
-
-				case State::MESSAGE_EVENT_PARAM:
-				{
-					data.push_back(byte);
-					chunkSize--;
-					if (chunkSize == 0)
-					{
-						state = State::MESSAGE_READY;
-						return pos;
-					}
-				}
-
-				default:
-					return pos;
-			}
-		}
-
-		return rawData.size();
-	}
-
-private:
-	State state;
-	DataType type;
-	size_t chunkSize;
-	std::vector<uint8_t> data;
 };
 
 #endif
