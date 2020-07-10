@@ -79,7 +79,7 @@ bool testBuffer(bool read)
 			{
 				for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
 				{
-					auto res = writePipe.PipePut("", arrBuffersIn[i], 1000, "");
+					auto res = writePipe.PipePut("", arrBuffersIn[i], 10000, "");
 					std::cout << "Write " << i << " res " << res << std::endl;
 
 					if (res != S_OK)
@@ -111,7 +111,7 @@ bool testBuffer(bool read)
 			for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
 			{
 				std::shared_ptr<MF_BASE_TYPE> buf;
-				auto res = readPipe.PipeGet("", buf, 1000, "");
+				auto res = readPipe.PipeGet("", buf, 10000, "");
 				std::cout << "Read " << i << " res " << res << std::endl;
 
 				const auto dp = dynamic_cast<MF_BUFFER *>(arrBuffersIn[i].get());
@@ -179,17 +179,25 @@ bool testFrame(bool read)
 		MFPipeImpl writePipe;
 		if (writePipe.PipeCreate(testPipeName, "") == S_OK)
 		{
-			for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
+			if (writePipe.PipeOpen(testPipeName, 32, "W") == S_OK)
 			{
-				auto res = writePipe.PipePut("", arrBuffersIn[i], 1000, "");
-				std::cout << "Write " << i << " res " << res << std::endl;
-
-				if (res != S_OK)
+				for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
 				{
-					std::cout << "Failed to write into pipe" << std::endl;
-					testRes = false;
-					break;
+					auto res = writePipe.PipePut("", arrBuffersIn[i], 1000, "");
+					std::cout << "Write " << i << " res " << res << std::endl;
+
+					if (res != S_OK)
+					{
+						std::cout << "Failed to write into pipe" << std::endl;
+						testRes = false;
+						break;
+					}
 				}
+			}
+			else
+			{
+				std::cout << "Failed to open pipe on write." << std::endl;
+				testRes = false;
 			}
 		}
 		else
@@ -203,22 +211,28 @@ bool testFrame(bool read)
 		std::cout << "READ" << std::endl;
 
 		MFPipeImpl readPipe;
-		readPipe.PipeOpen(testPipeName, 0, "");
-
-		for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
+		if (readPipe.PipeOpen(testPipeName, 32, "R") == S_OK)
 		{
-			std::shared_ptr<MF_BASE_TYPE> buf;
-			auto res = readPipe.PipeGet("", buf, 1000, "");
-			std::cout << "Read " << i << " res " << res << std::endl;
-
-			const auto dp = dynamic_cast<MF_FRAME *>(arrBuffersIn[i].get());
-			const auto bp = dynamic_cast<MF_FRAME *>(buf.get());
-
-			if (*dp != *bp)
+			for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
 			{
-				std::cout << "Read invalid data." << std::endl;
-				testRes = false;
+				std::shared_ptr<MF_BASE_TYPE> buf;
+				auto res = readPipe.PipeGet("", buf, 1000, "");
+				std::cout << "Read " << i << " res " << res << std::endl;
+
+				const auto dp = dynamic_cast<MF_FRAME *>(arrBuffersIn[i].get());
+				const auto bp = dynamic_cast<MF_FRAME *>(buf.get());
+
+				if (*dp != *bp)
+				{
+					std::cout << "Read invalid data." << std::endl;
+					testRes = false;
+				}
 			}
+		}
+		else
+		{
+			std::cout << "Failed to open pipe on read" << std::endl;
+			testRes = false;
 		}
 
 		readPipe.PipeClose();
@@ -243,17 +257,27 @@ bool testMessage(bool read)
 		MFPipeImpl writePipe;
 		if (writePipe.PipeCreate(testPipeName, "") == S_OK)
 		{
-			for (size_t i = 0; i < SIZEOF_ARRAY(pstrEvents); ++i)
+			if (writePipe.PipeOpen(testPipeName, 32, "W") == S_OK)
 			{
-				auto res = writePipe.PipeMessagePut("", pstrEvents[i], pstrMessages[i], 1000);
-				std::cout << "Message " << i << " write res " << res << std::endl;
-
-				if (res != S_OK)
+				for (size_t i = 0; i < SIZEOF_ARRAY(pstrEvents); ++i)
 				{
-					std::cout << "Failed to write message into pipe." << std::endl;
-					testRes = false;
-					break;
+					auto res = writePipe.PipeMessagePut("", pstrEvents[i], pstrMessages[i], 1000);
+					std::cout << "Message " << i << " write res " << res << std::endl;
+
+					if (res != S_OK)
+					{
+						std::cout << "Failed to write message into pipe." << std::endl;
+						testRes = false;
+						break;
+					}
 				}
+
+				writePipe.PipeClose();
+			}
+			else
+			{
+				std::cout << "Failed to open pipe on write." << std::endl;
+				testRes = false;
 			}
 		}
 		else
@@ -261,8 +285,6 @@ bool testMessage(bool read)
 			std::cout << "Failed to create pipe." << std::endl;
 			testRes = false;
 		}
-
-		writePipe.PipeClose();
 	}
 	else
 	{
@@ -271,22 +293,30 @@ bool testMessage(bool read)
 		MFPipeImpl readPipe;
 		readPipe.PipeOpen(testPipeName, 0, "");
 
-		for (size_t i = 0; i < SIZEOF_ARRAY(pstrEvents); ++i)
+		if (readPipe.PipeOpen(testPipeName, 32, "R") == S_OK)
 		{
-			std::string name;
-			std::string param;
-
-			auto res = readPipe.PipeMessageGet("", &name, &param, 1000);
-			std::cout << "Message " << i << " read res " << res << std::endl;
-
-			if (name != pstrEvents[i] || param != pstrMessages[i])
+			for (size_t i = 0; i < SIZEOF_ARRAY(pstrEvents); ++i)
 			{
-				std::cout << "Read invalid data." << std::endl;
-				testRes = false;
-			}
-		}
+				std::string name;
+				std::string param;
 
-		readPipe.PipeClose();
+				auto res = readPipe.PipeMessageGet("", &name, &param, 1000);
+				std::cout << "Message " << i << " read res " << res << std::endl;
+
+				if (name != pstrEvents[i] || param != pstrMessages[i])
+				{
+					std::cout << "Read invalid data." << std::endl;
+					testRes = false;
+				}
+			}
+
+			readPipe.PipeClose();
+		}
+		else
+		{
+			std::cout << "Failed to open pipe on read" << std::endl;
+			testRes = false;
+		}
 	}
 
 	return testRes;
@@ -318,92 +348,115 @@ bool testAll(bool read)
 	{
 		// Write pipe
 		MFPipeImpl MFPipe_Write;
-		MFPipe_Write.PipeCreate(testPipeName, "");
-
-		for (int i = 0; i < 1; ++i)
+		if (MFPipe_Write.PipeCreate(testPipeName, "") == S_OK)
 		{
-			std::cout << "Write " << i << std::endl;
+			if (MFPipe_Write.PipeOpen(testPipeName, 32, "W") == S_OK)
+			{
+				for (int i = 0; i < 1; ++i)
+				{
+					std::cout << "Write " << i << std::endl;
 
-			// Write to pipe
-			MFPipe_Write.PipePut("ch1", arrBuffersIn[i % PACKETS_COUNT], 100, "");
-			MFPipe_Write.PipePut("ch2", arrBuffersIn[(i + 1) % PACKETS_COUNT], 100, "");
-			MFPipe_Write.PipeMessagePut("ch1", pstrEvents[i % PACKETS_COUNT], pstrMessages[i % PACKETS_COUNT], 100);
-			MFPipe_Write.PipeMessagePut("ch2", pstrEvents[(i + 1) % PACKETS_COUNT], pstrMessages[(i + 1) % PACKETS_COUNT], 100);
+					// Write to pipe
+					MFPipe_Write.PipePut("ch1", arrBuffersIn[i % PACKETS_COUNT], 1000, "");
+					MFPipe_Write.PipePut("ch2", arrBuffersIn[(i + 1) % PACKETS_COUNT], 1000, "");
+//					MFPipe_Write.PipeMessagePut("ch1", pstrEvents[i % PACKETS_COUNT], pstrMessages[i % PACKETS_COUNT], 1000);
+//					MFPipe_Write.PipeMessagePut("ch2", pstrEvents[(i + 1) % PACKETS_COUNT], pstrMessages[(i + 1) % PACKETS_COUNT], 1000);
 
-			MFPipe_Write.PipePut("ch1", arrBuffersIn[i % PACKETS_COUNT], 100, "");
-			MFPipe_Write.PipePut("ch2", arrBuffersIn[(i + 1) % PACKETS_COUNT], 100, "");
+					MFPipe_Write.PipePut("ch1", arrBuffersIn[i % PACKETS_COUNT], 1000, "");
+					MFPipe_Write.PipePut("ch2", arrBuffersIn[(i + 1) % PACKETS_COUNT], 1000, "");
 
-			std::string strPipeName;
-			MFPipe_Write.PipeInfoGet(&strPipeName, "", NULL);
+					MFPipe_Write.PipeMessagePut("ch1", pstrEvents[i % PACKETS_COUNT], pstrMessages[i % PACKETS_COUNT], 1000);
+					MFPipe_Write.PipeMessagePut("ch2", pstrEvents[(i + 1) % PACKETS_COUNT], pstrMessages[(i + 1) % PACKETS_COUNT], 1000);
 
-			MFPipe::MF_PIPE_INFO mfInfo = {};
-			MFPipe_Write.PipeInfoGet(NULL, "ch2", &mfInfo);
-			MFPipe_Write.PipeInfoGet(NULL, "ch1", &mfInfo);
+					std::string strPipeName;
+					MFPipe_Write.PipeInfoGet(&strPipeName, "", NULL);
+
+					MFPipe::MF_PIPE_INFO mfInfo = {};
+					MFPipe_Write.PipeInfoGet(NULL, "ch2", &mfInfo);
+					MFPipe_Write.PipeInfoGet(NULL, "ch1", &mfInfo);
+				}
+			}
+			else
+			{
+				std::cout << "Failed to open pipe on write." << std::endl;
+				testRes = false;
+			}
+		}
+		else
+		{
+			std::cout << "Failed to create write pipe" << std::endl;
+			testRes = false;
 		}
 	}
 	else
 	{
 		// Read pipe
 		MFPipeImpl MFPipe_Read;
-		MFPipe_Read.PipeOpen(testPipeName, 32, "");
-
-		for (int i = 0; i < 1; ++i)
+		if (MFPipe_Read.PipeOpen(testPipeName, 32, "R") == S_OK)
 		{
-			std::cout << "Read " << i << std::endl;
-
-			// Read from pipe
-			std::string arrStrings[4];
-
-			std::shared_ptr<MF_BASE_TYPE> arrBuffersOut[8];
-			MFPipe_Read.PipeGet("ch1", arrBuffersOut[0], 100, "");
-			MFPipe_Read.PipeGet("ch2", arrBuffersOut[1], 100, "");
-
-			MFPipe_Read.PipeMessageGet("ch1", &arrStrings[0], &arrStrings[1], 100);
-			MFPipe_Read.PipeMessageGet("ch2", &arrStrings[2], &arrStrings[3], 100);
-			//		MFPipe_Read.PipeMessageGet("ch2", NULL, &arrStrings[2], 100);
-
-			MFPipe_Read.PipeGet("ch1", arrBuffersOut[2], 100, "");
-			MFPipe_Read.PipeGet("ch2", arrBuffersOut[3], 100, "");
-			//		MFPipe_Read.PipeGet("ch2", arrBuffersOut[6], 100, "");
-
-			// TODO: Your test code here
-
-			if (pstrEvents[i % PACKETS_COUNT] != arrStrings[0]
-					|| pstrMessages[i % PACKETS_COUNT] != arrStrings[1]
-					|| pstrEvents[(i + 1) % PACKETS_COUNT] != arrStrings[2]
-					|| pstrMessages[(i + 1) % PACKETS_COUNT] != arrStrings[3])
+			for (int i = 0; i < 1; ++i)
 			{
-				std::cout << "Message failed" << std::endl;
-				testRes = false;
-			}
+				std::cout << "Read " << i << std::endl;
 
-			if (*dynamic_cast<MF_BUFFER *>(arrBuffersIn[i % PACKETS_COUNT].get())
-					!= *dynamic_cast<MF_BUFFER *>(arrBuffersOut[0].get()))
-			{
-				std::cout << "Buffer 0 failed" << std::endl;
-				testRes = false;
-			}
+				// Read from pipe
+				std::string arrStrings[4];
 
-			if (*dynamic_cast<MF_BUFFER *>(arrBuffersIn[(i + 1) % PACKETS_COUNT].get())
-					!= *dynamic_cast<MF_BUFFER *>(arrBuffersOut[1].get()))
-			{
-				std::cout << "Buffer 1 failed" << std::endl;
-				testRes = false;
-			}
+				std::shared_ptr<MF_BASE_TYPE> arrBuffersOut[8];
+				MFPipe_Read.PipeGet("ch1", arrBuffersOut[0], 1000, "");
+				MFPipe_Read.PipeGet("ch2", arrBuffersOut[1], 1000, "");
 
-			if (*dynamic_cast<MF_BUFFER *>(arrBuffersIn[i % PACKETS_COUNT].get())
-					!= *dynamic_cast<MF_BUFFER *>(arrBuffersOut[2].get()))
-			{
-				std::cout << "Buffer 2 failed" << std::endl;
-				testRes = false;
-			}
+				MFPipe_Read.PipeMessageGet("ch1", &arrStrings[0], &arrStrings[1], 1000);
+				MFPipe_Read.PipeMessageGet("ch2", &arrStrings[2], &arrStrings[3], 1000);
+				//		MFPipe_Read.PipeMessageGet("ch2", NULL, &arrStrings[2], 100);
 
-			if (*dynamic_cast<MF_BUFFER *>(arrBuffersIn[(i + 1) % PACKETS_COUNT].get())
-					!= *dynamic_cast<MF_BUFFER *>(arrBuffersOut[3].get()))
-			{
-				std::cout << "Buffer 3 failed" << std::endl;
-				testRes = false;
+				MFPipe_Read.PipeGet("ch1", arrBuffersOut[2], 1000, "");
+				MFPipe_Read.PipeGet("ch2", arrBuffersOut[3], 1000, "");
+				//		MFPipe_Read.PipeGet("ch2", arrBuffersOut[6], 100, "");
+
+				// TODO: Your test code here
+
+				if (pstrEvents[i % PACKETS_COUNT] != arrStrings[0]
+						|| pstrMessages[i % PACKETS_COUNT] != arrStrings[1]
+						|| pstrEvents[(i + 1) % PACKETS_COUNT] != arrStrings[2]
+						|| pstrMessages[(i + 1) % PACKETS_COUNT] != arrStrings[3])
+				{
+					std::cout << "Message failed" << std::endl;
+					testRes = false;
+				}
+
+				if (*dynamic_cast<MF_BUFFER *>(arrBuffersIn[i % PACKETS_COUNT].get())
+						!= *dynamic_cast<MF_BUFFER *>(arrBuffersOut[0].get()))
+				{
+					std::cout << "Buffer 0 failed" << std::endl;
+					testRes = false;
+				}
+
+				if (*dynamic_cast<MF_BUFFER *>(arrBuffersIn[(i + 1) % PACKETS_COUNT].get())
+						!= *dynamic_cast<MF_BUFFER *>(arrBuffersOut[1].get()))
+				{
+					std::cout << "Buffer 1 failed" << std::endl;
+					testRes = false;
+				}
+
+				if (*dynamic_cast<MF_BUFFER *>(arrBuffersIn[i % PACKETS_COUNT].get())
+						!= *dynamic_cast<MF_BUFFER *>(arrBuffersOut[2].get()))
+				{
+					std::cout << "Buffer 2 failed" << std::endl;
+					testRes = false;
+				}
+
+				if (*dynamic_cast<MF_BUFFER *>(arrBuffersIn[(i + 1) % PACKETS_COUNT].get())
+						!= *dynamic_cast<MF_BUFFER *>(arrBuffersOut[3].get()))
+				{
+					std::cout << "Buffer 3 failed" << std::endl;
+					testRes = false;
+				}
 			}
+		}
+		else
+		{
+			std::cout << "Failed to open pipe on read" << std::endl;
+			testRes = false;
 		}
 	}
 
@@ -658,15 +711,15 @@ int main(int argc, char *argv[])
 		return res ? "OK" : "FAILED";
 	};
 
-//	{
-//		bool res = testParser();
-//		std::cout << "Parser: " << bool_to_str(res) << std::endl;
-//	}
+	{
+		bool res = testParser();
+		std::cout << "Parser: " << bool_to_str(res) << std::endl;
+	}
 
-//	{
-//		bool res = testPipeCreate();
-//		std::cout << "PipeCreate(): " << bool_to_str(res) << std::endl;
-//	}
+	{
+		bool res = testPipeCreate();
+		std::cout << "PipeCreate(): " << bool_to_str(res) << std::endl;
+	}
 
 	if (argc > 1)
 	{
@@ -679,38 +732,38 @@ int main(int argc, char *argv[])
 		std::cout << "Buffer write: " << bool_to_str(res) << std::endl;
 	}
 
-//	if (argc > 1)
-//	{
-//		bool res = testFrame(true);
-//		std::cout << "Frame read: " << bool_to_str(res) << std::endl;
-//	}
-//	else
-//	{
-//		bool res = testFrame(false);
-//		std::cout << "Frame write: " << bool_to_str(res) << std::endl;
-//	}
+	if (argc > 1)
+	{
+		bool res = testFrame(true);
+		std::cout << "Frame read: " << bool_to_str(res) << std::endl;
+	}
+	else
+	{
+		bool res = testFrame(false);
+		std::cout << "Frame write: " << bool_to_str(res) << std::endl;
+	}
 
-//	if (argc > 1)
-//	{
-//		bool res = testMessage(true);
-//		std::cout << "Message read: " << bool_to_str(res) << std::endl;
-//	}
-//	else
-//	{
-//		bool res = testMessage(false);
-//		std::cout << "Message write: " << bool_to_str(res) << std::endl;
-//	}
+	if (argc > 1)
+	{
+		bool res = testMessage(true);
+		std::cout << "Message read: " << bool_to_str(res) << std::endl;
+	}
+	else
+	{
+		bool res = testMessage(false);
+		std::cout << "Message write: " << bool_to_str(res) << std::endl;
+	}
 
-//	if (argc > 1)
-//	{
-//		bool res = testAll(true);
-//		std::cout << "Test all read: " << bool_to_str(res) << std::endl;
-//	}
-//	else
-//	{
-//		bool res = testAll(false);
-//		std::cout << "Test all write: " << bool_to_str(res) << std::endl;
-//	}
+	if (argc > 1)
+	{
+		bool res = testAll(true);
+		std::cout << "Test all read: " << bool_to_str(res) << std::endl;
+	}
+	else
+	{
+		bool res = testAll(false);
+		std::cout << "Test all write: " << bool_to_str(res) << std::endl;
+	}
 
 	return 0;
 }
