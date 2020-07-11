@@ -1,6 +1,7 @@
 #ifndef PIPEPROCESS_HPP
 #define PIPEPROCESS_HPP
 
+#include <chrono>
 #include <future>
 
 #include "../MFPipeImpl.h"
@@ -12,7 +13,7 @@
 #define SIZEOF_ARRAY(arr)	static_cast<size_t>(sizeof(arr)/sizeof((arr)[0]))
 #endif // SIZEOF_ARRAY
 
-static constexpr auto pipeName = "/tmp/testPipe";
+static constexpr auto pipeName = "./testPipe";
 
 bool testBuffer(bool read)
 {
@@ -526,6 +527,93 @@ bool testBufferMultithreaded()
 	return writeFut.get() && readFut.get();
 }
 
+bool testPerformance(bool read)
+{
+	std::shared_ptr<MF_BUFFER> buffer = std::make_shared<MF_BUFFER>();
+	buffer->flags = eMFBF_Buffer;
+	buffer->data.reserve(1024 * 1024);
+	for (auto i = 0; i < 1024 * 1024; ++i)
+		buffer->data.push_back(i);
+
+	bool testRes = true;
+
+	if (!read)
+	{
+		auto start = std::chrono::steady_clock::now();
+
+		MFPipeImpl writePipe;
+		if (writePipe.PipeCreate(pipeName, "") == S_OK)
+		{
+			if (writePipe.PipeOpen(pipeName, 32, "W") == S_OK)
+			{
+				for (auto i = 0; i < 1024 && testRes; ++i)
+				{
+					if (writePipe.PipePut("", buffer, 10000, "") != S_OK)
+					{
+						std::cout << "Failed to put buffer in write queue" << std::endl;
+						testRes = false;
+					}
+				}
+
+				writePipe.PipeClose();
+			}
+			else
+			{
+				std::cout << "Failed to open pipe on write" << std::endl;
+				testRes = false;
+			}
+		}
+		else
+		{
+			std::cout << "Failed to create pipe" << std::endl;
+		}
+
+		auto end = std::chrono::steady_clock::now();
+
+		auto time = end - start;
+		std::cout << "Written 1Gb in " << std::chrono::duration_cast<std::chrono::seconds>(time).count() << std::endl;
+	}
+	else
+	{
+		auto start = std::chrono::steady_clock::now();
+
+		MFPipeImpl readPipe;
+		if (readPipe.PipeOpen(pipeName, 32, "R") == S_OK)
+		{
+			for (auto i = 0; i < 1024 && testRes; ++i)
+			{
+				std::shared_ptr<MF_BASE_TYPE> buf;
+				auto res = readPipe.PipeGet("", buf, 10000, "");
+
+				if (res != S_OK)
+				{
+					std::cout << "Failed to get buffer from read queue" << std::endl;
+					testRes = false;
+				}
+				else if (*dynamic_cast<MF_BUFFER *>(buf.get()) != *buffer)
+				{
+					std::cout << "Read invalid data" << std::endl;
+					testRes = false;
+				}
+			}
+
+			readPipe.PipeClose();
+		}
+		else
+		{
+			std::cout << "Failed to open pipe on read" << std::endl;
+			testRes = false;
+		}
+
+		auto end = std::chrono::steady_clock::now();
+
+		auto time = end - start;
+		std::cout << "Read 1Gb in " << std::chrono::duration_cast<std::chrono::seconds>(time).count() << std::endl;
+	}
+
+	return testRes;
+}
+
 bool testPipeProcess(bool read)
 {
 	bool res = true;
@@ -543,6 +631,15 @@ bool testPipeMultithreaded()
 	bool res = true;
 
 	res = res && testBufferMultithreaded();
+
+	return res;
+}
+
+bool testPipePerformance(bool read)
+{
+	bool res = true;
+
+	res = res && testPerformance(read);
 
 	return res;
 }

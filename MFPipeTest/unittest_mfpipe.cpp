@@ -10,10 +10,12 @@ bool argExists(char **begin, char **end, const std::string &arg)
 
 int main(int argc, char *argv[])
 {
-	bool parser = argExists(argv, argv + argc, "p");
-	bool readProcess = argExists(argv, argv + argc, "r");
-	bool writeProcess = argExists(argv, argv + argc, "w");
-	bool multithreaded = argExists(argv, argv + argc, "m");
+	bool parser = argExists(argv, argv + argc, "parser");
+	bool readProcess = argExists(argv, argv + argc, "read");
+	bool writeProcess = argExists(argv, argv + argc, "write");
+	bool multithreaded = argExists(argv, argv + argc, "multi");
+	bool profilerRead = argExists(argv, argv + argc, "profilerR");
+	bool profilerWrite = argExists(argv, argv + argc, "profilerW");
 
 	auto bool_to_str = [](bool res) {
 		return res ? "OK" : "FAILED";
@@ -41,6 +43,18 @@ int main(int argc, char *argv[])
 	{
 		bool res = testPipeMultithreaded();
 		std::cout << "PipeMultithreaded: " << bool_to_str(res) << std::endl;
+	}
+
+	if (profilerRead)
+	{
+		bool res = testPipePerformance(true);
+		std::cout << "PipeProfiler READ: " << bool_to_str(res) << std::endl;
+	}
+
+	if (profilerWrite)
+	{
+		bool res = testPipePerformance(false);
+		std::cout << "PipeProfiler WRITE: " << bool_to_str(res) << std::endl;
 	}
 
 	return 0;
