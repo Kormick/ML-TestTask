@@ -65,7 +65,8 @@ public:
 	MF_HRESULT PipeOpen(
 			/*[in]*/ const std::string &strPipeID,
 			/*[in]*/ int _nMaxBuffers,
-			/*[in]*/ const std::string &strHints) override
+			/*[in]*/ const std::string &strHints,
+			/*[in]*/ int _nMaxWaitMs = 1000) override
 	{
 		if (strPipeID.empty())
 		{
@@ -80,7 +81,7 @@ public:
 			if (!io)
 				io = std::make_shared<IoPipe>();
 
-			if (!io->open(pipeId, IoInterface::Mode::READ))
+			if (!io->open(pipeId, IoInterface::Mode::READ, _nMaxWaitMs))
 			{
 				std::cout << "Failed to open pipe on read." << std::endl;
 				return MF_HRESULT::RES_FALSE;
@@ -93,7 +94,7 @@ public:
 		}
 		if (strHints.find("W") != std::string::npos)
 		{
-			if (!io->open(pipeId, IoInterface::Mode::WRITE))
+			if (!io->open(pipeId, IoInterface::Mode::WRITE, _nMaxWaitMs))
 			{
 				std::cout << "Failed to open pipe on write." << std::endl;
 				return MF_HRESULT::RES_FALSE;

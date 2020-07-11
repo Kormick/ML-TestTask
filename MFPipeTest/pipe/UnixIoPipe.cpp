@@ -1,5 +1,7 @@
 #include "UnixIoPipe.hpp"
 
+#include <chrono>
+#include <thread>
 #include "fcntl.h"
 #include "sys/stat.h"
 #include "unistd.h"
@@ -14,35 +16,36 @@ IoPipe::~IoPipe()
 		close();
 }
 
-bool IoPipe::create(const std::string &_pipeId)
+bool IoPipe::create(const std::string &pipeId)
 {
-	if (_pipeId.empty())
+	if (pipeId.empty())
 		return false;
 
-	remove(_pipeId.c_str());
-	if (mkfifo(_pipeId.c_str(), 0777) != 0)
+	remove(pipeId.c_str());
+	if (mkfifo(pipeId.c_str(), 0777) != 0)
 		return false;
-
-	pipeId = _pipeId;
 
 	return true;
 }
 
-bool IoPipe::open(const std::string &_pipeId, Mode mode)
+bool IoPipe::open(const std::string &pipeId, Mode mode, int32_t timeoutMs /* = 1000 */)
 {
-	if (fd != -1 || _pipeId.empty())
+	if (fd != -1 || pipeId.empty())
 		return false;
 
-	if (mode == Mode::READ)
+	const auto start = std::chrono::steady_clock::now();
+	do
 	{
-		fd = ::open(_pipeId.c_str(), O_RDONLY);
-		return fd != -1;
-	}
-	else if (mode == Mode::WRITE)
-	{
-		fd = ::open(_pipeId.c_str(), O_WRONLY);
-		return fd != -1;
-	}
+		if (mode == Mode::READ)
+			fd = ::open(pipeId.c_str(), O_RDONLY | O_NONBLOCK);
+		else if (mode == Mode::WRITE)
+			fd = ::open(pipeId.c_str(), O_WRONLY | O_NONBLOCK);
+
+		if (fd != -1)
+			return true;
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	} while (std::chrono::steady_clock::now() < start + std::chrono::milliseconds(timeoutMs));
 
 	return false;
 }

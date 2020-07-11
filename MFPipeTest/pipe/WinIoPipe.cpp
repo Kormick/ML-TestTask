@@ -1,6 +1,8 @@
 #include "WinIoPipe.hpp"
 
+#include <chrono>
 #include <iostream>
+#include <thread>
 
 IoPipe::IoPipe()
 	: fd(INVALID_HANDLE_VALUE)
@@ -36,49 +38,46 @@ bool IoPipe::create(const std::string &_pipeId)
 	return true;
 }
 
-bool IoPipe::open(const std::string &_pipeId, Mode mode)
+bool IoPipe::open(const std::string &_pipeId, Mode mode, int32_t timeoutMs /* = 1000 */)
 {
 	if (_pipeId.empty())
 		return false;
 
-	if (mode == Mode::READ)
+	const auto start = std::chrono::steady_clock::now();
+
+	do
 	{
-		fd = CreateFile(
-					_pipeId.c_str(),
-					GENERIC_READ,
-					0,
-					NULL,
-					OPEN_EXISTING,
-					0,
-					NULL);
-
-		if (fd == INVALID_HANDLE_VALUE)
+		if (mode == Mode::READ)
 		{
-			std::cout << "Failed to open pipe on read " << GetLastError() << std::endl;
-			return false;
+			fd = CreateFile(
+						_pipeId.c_str(),
+						GENERIC_READ,
+						0,
+						NULL,
+						OPEN_EXISTING,
+						0,
+						NULL);
+
+			if (fd != INVALID_HANDLE_VALUE)
+			{
+				mode = Mode::READ;
+				return true;
+			}
 		}
-		else
+		else if (mode == Mode::WRITE)
 		{
-			mode = Mode::READ;
-			return true;
-		}
-	}
-	else if (mode == Mode::WRITE)
-	{
-		auto res = ConnectNamedPipe(fd, NULL);
+			auto res = ConnectNamedPipe(fd, NULL);
 
-		auto err = GetLastError();
-		if (!res)
-			std::cout << "Failed to open pipe on write " << err << std::endl;
-
-		if (res || err == ERROR_PIPE_CONNECTED)
-		{
-			mode = Mode::WRITE;
-			return true;
+			auto err = GetLastError();
+			if (res || err == ERROR_PIPE_CONNECTED)
+			{
+				mode = Mode::WRITE;
+				return true;
+			}
 		}
 
-		return false;
-	}
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	} while (std::chrono::steady_clock::now() < start + std::chrono::milliseconds(timeoutMs));
 
 	return false;
 }

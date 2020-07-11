@@ -43,7 +43,8 @@ public:
 								   /*[in]*/ const std::string &strHints) = 0;
 	virtual MF_HRESULT PipeOpen( /*[in]*/ const std::string &strPipeID,
 								 /*[in]*/ int _nMaxBuffers,
-								 /*[in]*/ const std::string &strHints) = 0;
+								 /*[in]*/ const std::string &strHints,
+								 /*[in]*/ int _nMaxWaitMs = 1000) = 0;
 	virtual MF_HRESULT PipePut( /*[in]*/ const std::string &strChannel,
 								/*[in]*/ const std::shared_ptr<MF_BASE_TYPE> &pBufferOrFrame,
 								/*[in]*/ int _nMaxWaitMs,
