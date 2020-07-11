@@ -13,6 +13,8 @@
 #include "sys/stat.h"
 #include "unistd.h"
 
+#include "pipe/IoPipe.hpp"
+#include "IoInterface.hpp"
 #include "MFTypes.h"
 #include "MFPipe.h"
 #include "PipeReader.hpp"
@@ -21,7 +23,6 @@
 class MFPipeImpl: public MFPipe
 {
 public:
-
 	HRESULT PipeInfoGet(
 		/*[out]*/ std::string *pStrPipeName,
 		/*[in]*/ const std::string &strChannel,
@@ -40,18 +41,19 @@ public:
 			return E_INVALIDARG;
 		}
 
-		remove(strPipeID.c_str());
+		io = std::make_shared<IoPipe>();
 
-		if (mkfifo(strPipeID.c_str(), 0777) != 0)
+		if (io->create(strPipeID))
+		{
+			std::cout << "Pipe " << strPipeID << " created successfully." << std::endl;
+		}
+		else
 		{
 			std::cout << "Failed to create pipe. ERRNO: " << errno << std::endl;
-			return E_INVALIDARG;
-		} else {
-			std::cout << "Pipe " << strPipeID << " created successfully." << std::endl;
+			return S_FALSE;
 		}
 
 		pipeId = strPipeID;
-
 		return S_OK;
 	}
 
@@ -70,16 +72,31 @@ public:
 
 		if (strHints.find("R") != std::string::npos)
 		{
+			if (!io)
+				io = std::make_shared<IoPipe>();
+
+			if (!io->open(pipeId, IoInterface::Mode::READ))
+			{
+				std::cout << "Failed to open pipe on read." << std::endl;
+				return S_FALSE;
+			}
+
 			readDataBuffer = std::make_shared<std::deque<std::shared_ptr<MF_BASE_TYPE>>>();
 			readMessageBuffer = std::make_shared<std::deque<Message>>();
-			reader = std::make_unique<PipeReader>(pipeId, _nMaxBuffers, readDataBuffer, readMessageBuffer);
+			reader = std::make_unique<PipeReader>(io, pipeId, _nMaxBuffers, readDataBuffer, readMessageBuffer);
 			reader->start();
 		}
 		if (strHints.find("W") != std::string::npos)
 		{
+			if (!io->open(pipeId, IoInterface::Mode::WRITE))
+			{
+				std::cout << "Failed to open pipe on write." << std::endl;
+				return S_FALSE;
+			}
+
 			writeDataBuffer = std::make_shared<std::deque<std::shared_ptr<MF_BASE_TYPE>>>();
 			writeMessageBuffer = std::make_shared<std::deque<Message>>();
-			writer = std::make_unique<PipeWriter>(pipeId, writeDataBuffer, writeMessageBuffer);
+			writer = std::make_unique<PipeWriter>(io, pipeId, writeDataBuffer, writeMessageBuffer);
 			writer->start();
 		}
 
@@ -213,6 +230,8 @@ public:
 private:
 	std::string pipeId;
 	MF_PIPE_INFO pipeInfo;
+
+	std::shared_ptr<IoInterface> io;
 
 	std::timed_mutex readMutex;
 	std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> readDataBuffer;

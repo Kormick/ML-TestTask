@@ -6,12 +6,14 @@
 #include <mutex>
 #include <thread>
 
+#include "IoInterface.hpp"
 #include "MFTypes.h"
 
 class PipeWriter
 {
 public:
-	PipeWriter(const std::string &pipeId,
+	PipeWriter(std::shared_ptr<IoInterface> io,
+			   const std::string &pipeId,
 			   std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> dataBuffer,
 			   std::shared_ptr<std::deque<Message>> messageBuffer);
 
@@ -28,6 +30,7 @@ private:
 	std::string pipeId;
 	int32_t fd;
 
+	std::shared_ptr<IoInterface> io;
 	std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> dataBuffer;
 	std::shared_ptr<std::deque<Message>> messageBuffer;
 

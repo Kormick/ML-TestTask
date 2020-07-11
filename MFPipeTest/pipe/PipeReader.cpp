@@ -3,14 +3,16 @@
 #include "fcntl.h"
 #include "unistd.h"
 
-PipeReader::PipeReader(const std::string &pipeId,
-		   size_t maxBuffers,
-		   std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> dataBuffer,
-		   std::shared_ptr<std::deque<Message>> messageBuffer)
+PipeReader::PipeReader(std::shared_ptr<IoInterface> io,
+					   const std::string &pipeId,
+					   size_t maxBuffers,
+					   std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> dataBuffer,
+					   std::shared_ptr<std::deque<Message>> messageBuffer)
 	: isRunning(false),
 	  pipeId(pipeId),
 	  fd(-1),
 	  maxBuffers(maxBuffers),
+	  io(io),
 	  dataBuffer(dataBuffer),
 	  messageBuffer(messageBuffer)
 {}
@@ -54,29 +56,13 @@ void PipeReader::run(const std::string &pipeId,
 			continue;
 		}
 
-		if (fd == -1)
-		{
-			fd = open(pipeId.c_str(), O_RDONLY);
-			if (fd == -1)
-			{
-				std::cout << errno << std::endl;
-				mutex.unlock();
-				std::this_thread::sleep_for(std::chrono::milliseconds(1));
-				continue;
-			}
-			else
-			{
-				std::cout << "READER opened pipe " << fd << std::endl;
-			}
-		}
-
 		bool doRead = true;
 		while (doRead)
 		{
 			uint8_t byte = 0;
 			std::vector<uint8_t> data;
 
-			auto readBytes = read(fd, &byte, sizeof(uint8_t));
+			auto readBytes = io->read(&byte, sizeof(byte));
 			if (readBytes <= 0)
 				break;
 
@@ -120,8 +106,72 @@ void PipeReader::run(const std::string &pipeId,
 			}
 		}
 
+//		if (fd == -1)
+//		{
+//			fd = open(pipeId.c_str(), O_RDONLY);
+//			if (fd == -1)
+//			{
+//				std::cout << errno << std::endl;
+//				mutex.unlock();
+//				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+//				continue;
+//			}
+//			else
+//			{
+//				std::cout << "READER opened pipe " << fd << std::endl;
+//			}
+//		}
+
+//		bool doRead = true;
+//		while (doRead)
+//		{
+//			uint8_t byte = 0;
+//			std::vector<uint8_t> data;
+
+//			auto readBytes = read(fd, &byte, sizeof(uint8_t));
+//			if (readBytes <= 0)
+//				break;
+
+//			data.push_back(byte);
+//			parser.parse(data, 0);
+
+//			switch (parser.getState())
+//			{
+//				case PipeParser::State::BUFFER_READY:
+//				{
+//					const auto data = parser.getData();
+
+//					MF_BUFFER buffer;
+//					dataBuffer->push_back(std::shared_ptr<MF_BASE_TYPE>(buffer.deserialize(data)));
+//					parser.reset();
+//					doRead = false;
+//					break;
+//				}
+//				case PipeParser::State::FRAME_READY:
+//				{
+//					const auto data = parser.getData();
+
+//					MF_FRAME frame;
+//					dataBuffer->push_back(std::shared_ptr<MF_BASE_TYPE>(frame.deserialize(data)));
+//					parser.reset();
+//					doRead = false;
+//					break;
+//				}
+//				case PipeParser::State::MESSAGE_READY:
+//				{
+//					const auto data = parser.getData();
+
+//					Message message;
+//					messageBuffer->push_back(message.deserialize(data));
+//					parser.reset();
+//					doRead = false;
+//					break;
+//				}
+//				default:
+//					break;
+//			}
+//		}
+
 		mutex.unlock();
 	}
-
-	close(fd);
 }
