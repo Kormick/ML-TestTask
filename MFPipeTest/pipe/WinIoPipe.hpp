@@ -19,8 +19,8 @@ public:
 
 private:
 	std::string pipeId;
-    Mode mode;
-    HANDLE fd;
+	Mode mode;
+	HANDLE fd;
 };
 
 #endif // WINIOPIPE_HPP
