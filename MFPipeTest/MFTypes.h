@@ -10,14 +10,14 @@
 
 typedef long long int REFERENCE_TIME;
 
-typedef	enum HRESULT
+typedef	enum MF_HRESULT
 {
-	S_OK = 0,
-	S_FALSE = 1,
-	E_NOTIMPL = 0x80004001L,
-	E_OUTOFMEMORY = 0x8007000EL,
-	E_INVALIDARG = 0x80070057L
-} HRESULT;
+    RES_OK = 0,
+    RES_FALSE = 1,
+    NOTIMPL = 0x80004001L,
+    OUTOFMEMORY = 0x8007000EL,
+    INVALIDARG = 0x80070057L
+} MF_HRESULT;
 
 enum class DataType
 {

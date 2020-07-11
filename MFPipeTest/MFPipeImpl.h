@@ -13,7 +13,12 @@
 #include "sys/stat.h"
 #include "unistd.h"
 
-#include "pipe/IoPipe.hpp"
+#ifdef unix
+#include "pipe/UnixIoPipe.hpp"
+#else
+#include "pipe/WinIoPipe.hpp"
+#endif
+
 #include "IoInterface.hpp"
 #include "MFTypes.h"
 #include "MFPipe.h"
@@ -23,22 +28,22 @@
 class MFPipeImpl: public MFPipe
 {
 public:
-	HRESULT PipeInfoGet(
+    MF_HRESULT PipeInfoGet(
 		/*[out]*/ std::string *pStrPipeName,
 		/*[in]*/ const std::string &strChannel,
 		MF_PIPE_INFO* _pPipeInfo) override
 	{
-		return E_NOTIMPL;
+        return MF_HRESULT::NOTIMPL;
 	}
 
-	HRESULT PipeCreate(
+    MF_HRESULT PipeCreate(
 		/*[in]*/ const std::string &strPipeID,
 		/*[in]*/ const std::string &strHints) override
 	{
 		if (strPipeID.empty())
 		{
 			std::cout << "Can't create pipe with empty name." << std::endl;
-			return E_INVALIDARG;
+            return MF_HRESULT::INVALIDARG;
 		}
 
 		io = std::make_shared<IoPipe>();
@@ -50,14 +55,14 @@ public:
 		else
 		{
 			std::cout << "Failed to create pipe. ERRNO: " << errno << std::endl;
-			return S_FALSE;
+            return MF_HRESULT::RES_FALSE;
 		}
 
 		pipeId = strPipeID;
-		return S_OK;
+        return MF_HRESULT::RES_OK;
 	}
 
-	HRESULT PipeOpen(
+    MF_HRESULT PipeOpen(
 		/*[in]*/ const std::string &strPipeID,
 		/*[in]*/ int _nMaxBuffers,
 		/*[in]*/ const std::string &strHints) override
@@ -65,7 +70,7 @@ public:
 		if (strPipeID.empty())
 		{
 			std::cout << "Can't open pipe with empty name." << std::endl;
-			return E_INVALIDARG;
+            return MF_HRESULT::INVALIDARG;
 		}
 
 		pipeId = strPipeID;
@@ -78,7 +83,7 @@ public:
 			if (!io->open(pipeId, IoInterface::Mode::READ))
 			{
 				std::cout << "Failed to open pipe on read." << std::endl;
-				return S_FALSE;
+                return MF_HRESULT::RES_FALSE;
 			}
 
 			readDataBuffer = std::make_shared<std::deque<std::shared_ptr<MF_BASE_TYPE>>>();
@@ -91,7 +96,7 @@ public:
 			if (!io->open(pipeId, IoInterface::Mode::WRITE))
 			{
 				std::cout << "Failed to open pipe on write." << std::endl;
-				return S_FALSE;
+                return MF_HRESULT::RES_FALSE;
 			}
 
 			writeDataBuffer = std::make_shared<std::deque<std::shared_ptr<MF_BASE_TYPE>>>();
@@ -100,10 +105,10 @@ public:
 			writer->start();
 		}
 
-		return S_OK;
+        return MF_HRESULT::RES_OK;
 	}
 
-	HRESULT PipePut(
+    MF_HRESULT PipePut(
 		/*[in]*/ const std::string &strChannel,
 		/*[in]*/ const std::shared_ptr<MF_BASE_TYPE> &pBufferOrFrame,
 		/*[in]*/ int _nMaxWaitMs,
@@ -112,7 +117,7 @@ public:
 		if (!writeMutex.try_lock_for(std::chrono::milliseconds(_nMaxWaitMs)))
 		{
 			std::cout << "Failed to add buffer to write queue." << std::endl;
-			return S_FALSE;
+            return MF_HRESULT::RES_FALSE;
 		}
 
 		// TODO check buffer size
@@ -120,10 +125,10 @@ public:
 		writeDataBuffer->push_back(pBufferOrFrame);
 		writeMutex.unlock();
 
-		return S_OK;
+        return MF_HRESULT::RES_OK;
 	}
 
-	HRESULT PipeGet(
+    MF_HRESULT PipeGet(
 		/*[in]*/ const std::string &strChannel,
 		/*[out]*/ std::shared_ptr<MF_BASE_TYPE> &pBufferOrFrame,
 		/*[in]*/ int _nMaxWaitMs,
@@ -134,7 +139,7 @@ public:
 		if (!readMutex.try_lock_for(std::chrono::milliseconds(_nMaxWaitMs)))
 		{
 			std::cout << "Failed to get buffer from read queue" << std::endl;
-			return S_FALSE;
+            return MF_HRESULT::RES_FALSE;
 		}
 
 		do
@@ -148,23 +153,23 @@ public:
 			pBufferOrFrame = readDataBuffer->front();
 			readDataBuffer->pop_front();
 			readMutex.unlock();
-			return S_OK;
+            return MF_HRESULT::RES_OK;
 		} while (std::chrono::steady_clock::now() < start + std::chrono::milliseconds(_nMaxWaitMs));
 
-		return S_FALSE;
+        return MF_HRESULT::RES_FALSE;
 	}
 
-	HRESULT PipePeek(
+    MF_HRESULT PipePeek(
 		/*[in]*/ const std::string &strChannel,
 		/*[in]*/ int _nIndex,
 		/*[out]*/ std::shared_ptr<MF_BASE_TYPE>& pBufferOrFrame,
 		/*[in]*/ int _nMaxWaitMs,
 		/*[in]*/ const std::string &strHints) override
 	{
-		return E_NOTIMPL;
+        return MF_HRESULT::NOTIMPL;
 	}
 
-	HRESULT PipeMessagePut(
+    MF_HRESULT PipeMessagePut(
 		/*[in]*/ const std::string &strChannel,
 		/*[in]*/ const std::string &strEventName,
 		/*[in]*/ const std::string &strEventParam,
@@ -173,7 +178,7 @@ public:
 		if (!writeMutex.try_lock_for(std::chrono::milliseconds(_nMaxWaitMs)))
 		{
 			std::cout << "Failed to add message to write queue" << std::endl;
-			return S_FALSE;
+            return MF_HRESULT::RES_FALSE;
 		}
 
 		// TODO check buffer size
@@ -181,10 +186,10 @@ public:
 		writeMessageBuffer->push_back({ strEventName, strEventParam });
 		writeMutex.unlock();
 
-		return S_OK;
+        return MF_HRESULT::RES_OK;
 	}
 
-	HRESULT PipeMessageGet(
+    MF_HRESULT PipeMessageGet(
 		/*[in]*/ const std::string &strChannel,
 		/*[out]*/ std::string *pStrEventName,
 		/*[out]*/ std::string *pStrEventParam,
@@ -195,7 +200,7 @@ public:
 		if (!readMutex.try_lock_for(std::chrono::milliseconds(_nMaxWaitMs)))
 		{
 			std::cout << "Failed to get message from read queue" << std::endl;
-			return S_FALSE;
+            return MF_HRESULT::RES_FALSE;
 		}
 
 		do
@@ -211,20 +216,20 @@ public:
 			*pStrEventName = mes.name;
 			*pStrEventParam = mes.param;
 			readMutex.unlock();
-			return S_OK;
+            return MF_HRESULT::RES_OK;
 		} while (std::chrono::steady_clock::now() < start + std::chrono::milliseconds(_nMaxWaitMs));
 
-		return S_FALSE;
+        return MF_HRESULT::RES_FALSE;
 	}
 
-	HRESULT PipeFlush( /*[in]*/ const std::string &strChannel, /*[in]*/ eMFFlashFlags _eFlashFlags) override
+    MF_HRESULT PipeFlush( /*[in]*/ const std::string &strChannel, /*[in]*/ eMFFlashFlags _eFlashFlags) override
 	{
-		return E_NOTIMPL;
+        return MF_HRESULT::NOTIMPL;
 	}
 
-	HRESULT PipeClose() override
+    MF_HRESULT PipeClose() override
 	{
-		return E_NOTIMPL;
+        return MF_HRESULT::NOTIMPL;
 	}
 
 private:

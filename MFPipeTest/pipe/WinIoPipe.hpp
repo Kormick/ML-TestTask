@@ -1,7 +1,9 @@
-#ifndef IOPIPE_HPP
-#define IOPIPE_HPP
+#ifndef WINIOPIPE_HPP
+#define WINIOPIPE_HPP
 
 #include "IoInterface.hpp"
+
+#include "windows.h"
 
 class IoPipe : public IoInterface
 {
@@ -17,7 +19,8 @@ public:
 
 private:
 	std::string pipeId;
-	int32_t fd;
+    Mode mode;
+    HANDLE fd;
 };
 
-#endif // IOPIPE_HPP
+#endif // WINIOPIPE_HPP

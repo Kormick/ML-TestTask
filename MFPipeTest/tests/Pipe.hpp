@@ -13,7 +13,11 @@
 #define SIZEOF_ARRAY(arr)	static_cast<size_t>(sizeof(arr)/sizeof((arr)[0]))
 #endif // SIZEOF_ARRAY
 
+#ifdef unix
 static constexpr auto pipeName = "./testPipe";
+#else
+static constexpr auto pipeName = "\\\\.\\pipe\\testPipe";
+#endif
 
 bool testBuffer(bool read)
 {
@@ -37,16 +41,16 @@ bool testBuffer(bool read)
 		std::cout << "WRITE" << std::endl;
 
 		MFPipeImpl writePipe;
-		if (writePipe.PipeCreate(pipeName, "") == S_OK)
+		if (writePipe.PipeCreate(pipeName, "") == MF_HRESULT::RES_OK)
 		{
-			if (writePipe.PipeOpen(pipeName, 32, "W") == S_OK)
+			if (writePipe.PipeOpen(pipeName, 32, "W") == MF_HRESULT::RES_OK)
 			{
 				for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
 				{
 					auto res = writePipe.PipePut("", arrBuffersIn[i], 10000, "");
 					std::cout << "Write " << i << " res " << res << std::endl;
 
-					if (res != S_OK)
+					if (res != MF_HRESULT::RES_OK)
 					{
 						std::cout << "Failed to write into pipe" << std::endl;
 						testRes = false;
@@ -70,7 +74,7 @@ bool testBuffer(bool read)
 		std::cout << "READ" << std::endl;
 
 		MFPipeImpl readPipe;
-		if (readPipe.PipeOpen(pipeName, 32, "R") == S_OK)
+		if (readPipe.PipeOpen(pipeName, 32, "R") == MF_HRESULT::RES_OK)
 		{
 			for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
 			{
@@ -141,16 +145,16 @@ bool testFrame(bool read)
 		std::cout << "WRITE" << std::endl;
 
 		MFPipeImpl writePipe;
-		if (writePipe.PipeCreate(pipeName, "") == S_OK)
+		if (writePipe.PipeCreate(pipeName, "") == MF_HRESULT::RES_OK)
 		{
-			if (writePipe.PipeOpen(pipeName, 32, "W") == S_OK)
+			if (writePipe.PipeOpen(pipeName, 32, "W") == MF_HRESULT::RES_OK)
 			{
 				for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
 				{
 					auto res = writePipe.PipePut("", arrBuffersIn[i], 1000, "");
 					std::cout << "Write " << i << " res " << res << std::endl;
 
-					if (res != S_OK)
+					if (res != MF_HRESULT::RES_OK)
 					{
 						std::cout << "Failed to write into pipe" << std::endl;
 						testRes = false;
@@ -175,7 +179,7 @@ bool testFrame(bool read)
 		std::cout << "READ" << std::endl;
 
 		MFPipeImpl readPipe;
-		if (readPipe.PipeOpen(pipeName, 32, "R") == S_OK)
+		if (readPipe.PipeOpen(pipeName, 32, "R") == MF_HRESULT::RES_OK)
 		{
 			for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
 			{
@@ -219,16 +223,16 @@ bool testMessage(bool read)
 		std::cout << "WRITE" << std::endl;
 
 		MFPipeImpl writePipe;
-		if (writePipe.PipeCreate(pipeName, "") == S_OK)
+		if (writePipe.PipeCreate(pipeName, "") == MF_HRESULT::RES_OK)
 		{
-			if (writePipe.PipeOpen(pipeName, 32, "W") == S_OK)
+			if (writePipe.PipeOpen(pipeName, 32, "W") == MF_HRESULT::RES_OK)
 			{
 				for (size_t i = 0; i < SIZEOF_ARRAY(pstrEvents); ++i)
 				{
 					auto res = writePipe.PipeMessagePut("", pstrEvents[i], pstrMessages[i], 1000);
 					std::cout << "Message " << i << " write res " << res << std::endl;
 
-					if (res != S_OK)
+					if (res != MF_HRESULT::RES_OK)
 					{
 						std::cout << "Failed to write message into pipe." << std::endl;
 						testRes = false;
@@ -257,7 +261,7 @@ bool testMessage(bool read)
 		MFPipeImpl readPipe;
 		readPipe.PipeOpen(pipeName, 0, "");
 
-		if (readPipe.PipeOpen(pipeName, 32, "R") == S_OK)
+		if (readPipe.PipeOpen(pipeName, 32, "R") == MF_HRESULT::RES_OK)
 		{
 			for (size_t i = 0; i < SIZEOF_ARRAY(pstrEvents); ++i)
 			{
@@ -314,9 +318,9 @@ bool testAll(bool read)
 	{
 		// Write pipe
 		MFPipeImpl MFPipe_Write;
-		if (MFPipe_Write.PipeCreate(pipeName, "") == S_OK)
+		if (MFPipe_Write.PipeCreate(pipeName, "") == MF_HRESULT::RES_OK)
 		{
-			if (MFPipe_Write.PipeOpen(pipeName, 32, "W") == S_OK)
+			if (MFPipe_Write.PipeOpen(pipeName, 32, "W") == MF_HRESULT::RES_OK)
 			{
 				for (int i = 0; i < 1; ++i)
 				{
@@ -355,7 +359,7 @@ bool testAll(bool read)
 	{
 		// Read pipe
 		MFPipeImpl MFPipe_Read;
-		if (MFPipe_Read.PipeOpen(pipeName, 32, "R") == S_OK)
+		if (MFPipe_Read.PipeOpen(pipeName, 32, "R") == MF_HRESULT::RES_OK)
 		{
 			for (int i = 0; i < 1; ++i)
 			{
@@ -433,16 +437,16 @@ bool testBufferMultithreadedWrite(std::shared_ptr<MF_BUFFER> *buffers, size_t si
 	bool testRes = true;
 
 	MFPipeImpl writePipe;
-	if (writePipe.PipeCreate(pipeName, "") == S_OK)
+	if (writePipe.PipeCreate(pipeName, "") == MF_HRESULT::RES_OK)
 	{
-		if (writePipe.PipeOpen(pipeName, 32, "W") == S_OK)
+		if (writePipe.PipeOpen(pipeName, 32, "W") == MF_HRESULT::RES_OK)
 		{
 			for (size_t i = 0; i < size; ++i)
 			{
 				auto res = writePipe.PipePut("", buffers[i], 1000, "");
 				std::cout << "Write " << i << " res " << res << std::endl;
 
-				if (res != S_OK)
+				if (res != MF_HRESULT::RES_OK)
 				{
 					std::cout << "Failed to write into pipe" << std::endl;
 					testRes = false;
@@ -475,7 +479,7 @@ bool testBufferMultithreadedRead(std::shared_ptr<MF_BUFFER> *buffers, size_t siz
 	bool testRes = true;
 
 	MFPipeImpl readPipe;
-	if (readPipe.PipeOpen(pipeName, 32, "R") == S_OK)
+	if (readPipe.PipeOpen(pipeName, 32, "R") == MF_HRESULT::RES_OK)
 	{
 		for (size_t i = 0; i < size; ++i)
 		{
@@ -542,13 +546,13 @@ bool testPerformance(bool read)
 		auto start = std::chrono::steady_clock::now();
 
 		MFPipeImpl writePipe;
-		if (writePipe.PipeCreate(pipeName, "") == S_OK)
+		if (writePipe.PipeCreate(pipeName, "") == MF_HRESULT::RES_OK)
 		{
-			if (writePipe.PipeOpen(pipeName, 32, "W") == S_OK)
+			if (writePipe.PipeOpen(pipeName, 32, "W") == MF_HRESULT::RES_OK)
 			{
 				for (auto i = 0; i < 1024 && testRes; ++i)
 				{
-					if (writePipe.PipePut("", buffer, 10000, "") != S_OK)
+					if (writePipe.PipePut("", buffer, 10000, "") != MF_HRESULT::RES_OK)
 					{
 						std::cout << "Failed to put buffer in write queue" << std::endl;
 						testRes = false;
@@ -578,14 +582,14 @@ bool testPerformance(bool read)
 		auto start = std::chrono::steady_clock::now();
 
 		MFPipeImpl readPipe;
-		if (readPipe.PipeOpen(pipeName, 32, "R") == S_OK)
+		if (readPipe.PipeOpen(pipeName, 32, "R") == MF_HRESULT::RES_OK)
 		{
 			for (auto i = 0; i < 1024 && testRes; ++i)
 			{
 				std::shared_ptr<MF_BASE_TYPE> buf;
 				auto res = readPipe.PipeGet("", buf, 10000, "");
 
-				if (res != S_OK)
+				if (res != MF_HRESULT::RES_OK)
 				{
 					std::cout << "Failed to get buffer from read queue" << std::endl;
 					testRes = false;
