@@ -37,36 +37,36 @@ public:
 	virtual ~MFPipe() {}
 
 	virtual MF_HRESULT PipeInfoGet(/*[out]*/ std::string *pStrPipeName,
-								/*[in]*/ const std::string &strChannel,
-								MF_PIPE_INFO* _pPipeInfo) = 0;
+								   /*[in]*/ const std::string &strChannel,
+								   MF_PIPE_INFO* _pPipeInfo) = 0;
 	virtual MF_HRESULT PipeCreate( /*[in]*/ const std::string &strPipeID,
-								/*[in]*/ const std::string &strHints) = 0;
+								   /*[in]*/ const std::string &strHints) = 0;
 	virtual MF_HRESULT PipeOpen( /*[in]*/ const std::string &strPipeID,
-							  /*[in]*/ int _nMaxBuffers,
-							  /*[in]*/ const std::string &strHints) = 0;
+								 /*[in]*/ int _nMaxBuffers,
+								 /*[in]*/ const std::string &strHints) = 0;
 	virtual MF_HRESULT PipePut( /*[in]*/ const std::string &strChannel,
-							 /*[in]*/ const std::shared_ptr<MF_BASE_TYPE> &pBufferOrFrame,
-							 /*[in]*/ int _nMaxWaitMs,
-							 /*[in]*/ const std::string &strHints) = 0;
+								/*[in]*/ const std::shared_ptr<MF_BASE_TYPE> &pBufferOrFrame,
+								/*[in]*/ int _nMaxWaitMs,
+								/*[in]*/ const std::string &strHints) = 0;
 	virtual MF_HRESULT PipeGet( /*[in]*/ const std::string &strChannel,
-							 /*[out]*/ std::shared_ptr<MF_BASE_TYPE> &pBufferOrFrame,
-							 /*[in]*/ int _nMaxWaitMs,
-							 /*[in]*/ const std::string &strHints) = 0;
+								/*[out]*/ std::shared_ptr<MF_BASE_TYPE> &pBufferOrFrame,
+								/*[in]*/ int _nMaxWaitMs,
+								/*[in]*/ const std::string &strHints) = 0;
 	virtual MF_HRESULT PipePeek( /*[in]*/ const std::string &strChannel,
-							  /*[in]*/ int _nIndex,
-							  /*[out]*/ std::shared_ptr<MF_BASE_TYPE>& pBufferOrFrame,
-							  /*[in]*/ int _nMaxWaitMs,
-							  /*[in]*/ const std::string &strHints) = 0;
+								 /*[in]*/ int _nIndex,
+								 /*[out]*/ std::shared_ptr<MF_BASE_TYPE>& pBufferOrFrame,
+								 /*[in]*/ int _nMaxWaitMs,
+								 /*[in]*/ const std::string &strHints) = 0;
 	virtual MF_HRESULT PipeMessagePut(
-		/*[in]*/ const std::string &strChannel,
-		/*[in]*/ const std::string &strEventName,
-		/*[in]*/ const std::string &strEventParam,
-		/*[in]*/ int _nMaxWaitMs) = 0;
+			/*[in]*/ const std::string &strChannel,
+			/*[in]*/ const std::string &strEventName,
+			/*[in]*/ const std::string &strEventParam,
+			/*[in]*/ int _nMaxWaitMs) = 0;
 	virtual MF_HRESULT PipeMessageGet(
-		/*[in]*/ const std::string &strChannel,
-		/*[out]*/ std::string *pStrEventName,
-		/*[out]*/ std::string *pStrEventParam,
-		/*[in]*/ int _nMaxWaitMs) = 0;
+			/*[in]*/ const std::string &strChannel,
+			/*[out]*/ std::string *pStrEventName,
+			/*[out]*/ std::string *pStrEventParam,
+			/*[in]*/ int _nMaxWaitMs) = 0;
 	virtual MF_HRESULT PipeFlush( /*[in]*/ const std::string &strChannel, /*[in]*/ eMFFlashFlags _eFlashFlags) = 0;
 	virtual MF_HRESULT PipeClose() = 0;
 };

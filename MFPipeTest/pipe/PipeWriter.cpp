@@ -40,8 +40,8 @@ void PipeWriter::stop()
 }
 
 void PipeWriter::run(const std::string &pipeId,
-		 std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> dataBuffer,
-		 std::shared_ptr<std::deque<Message>> messageBuffer)
+					 std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> dataBuffer,
+					 std::shared_ptr<std::deque<Message>> messageBuffer)
 {
 	std::cout << "WRITER started" << std::endl;
 
@@ -49,22 +49,6 @@ void PipeWriter::run(const std::string &pipeId,
 	{
 		if (!mutex.try_lock_for(std::chrono::milliseconds(10)))
 			continue;
-
-//		if (fd == -1)
-//		{
-//			fd = open(pipeId.c_str(), O_WRONLY);
-//			if (fd == -1)
-//			{
-//				std::cout << errno << std::endl;
-//				mutex.unlock();
-//				std::this_thread::sleep_for(std::chrono::milliseconds(1));
-//				continue;
-//			}
-//			else
-//			{
-//				std::cout << "WRITER opened pipe " << fd << std::endl;
-//			}
-//		}
 
 		if (dataBuffer->empty() && messageBuffer->empty())
 		{
@@ -82,7 +66,6 @@ void PipeWriter::run(const std::string &pipeId,
 
 			do
 			{
-//				auto bytes = write(fd, data.data() + bytesWritten, data.size() - bytesWritten);
 				auto bytes = io->write(data.data() + bytesWritten, data.size() - bytesWritten);
 				if (bytes != -1)
 					bytesWritten += bytes;
@@ -101,7 +84,6 @@ void PipeWriter::run(const std::string &pipeId,
 
 			do
 			{
-//				auto bytes = write(fd, data.data() + bytesWritten, data.size() - bytesWritten);
 				auto bytes = io->write(data.data() + bytesWritten, data.size() - bytesWritten);
 				if (bytes != -1)
 					bytesWritten += bytes;
