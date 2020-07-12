@@ -5,14 +5,12 @@
 
 PipeWriter::PipeWriter(std::shared_ptr<IoInterface> io,
 					   const std::string &pipeId,
-					   std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> dataBuffer,
-					   std::shared_ptr<std::deque<Message>> messageBuffer)
+                       std::shared_ptr<DataBuffer> dataBuffer)
 	: isRunning(false),
 	  pipeId(pipeId),
 	  fd(-1),
 	  io(io),
-	  dataBuffer(dataBuffer),
-	  messageBuffer(messageBuffer)
+      dataBuffer(dataBuffer)
 {}
 
 PipeWriter::~PipeWriter()
@@ -24,44 +22,48 @@ PipeWriter::~PipeWriter()
 void PipeWriter::start()
 {
 	isRunning = true;
-	thread.reset(new std::thread(&PipeWriter::run, this, std::cref(pipeId), dataBuffer, messageBuffer));
+	thread.reset(new std::thread(&PipeWriter::run, this, std::cref(pipeId), dataBuffer));
 }
 
 void PipeWriter::stop()
 {
 	while (true)
 	{
-		if (dataBuffer->empty() && messageBuffer->empty())
-			break;
-		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		if (dataBuffer->mutex.try_lock())
+		{
+			if (dataBuffer->data.empty() && dataBuffer->messages.empty())
+				break;
+		}
+		dataBuffer->mutex.unlock();
+		std::this_thread::yield();
 	}
 	isRunning = false;
-	thread->join();
+	if (thread->joinable())
+		thread->join();
 }
 
 void PipeWriter::run(const std::string &pipeId,
-					 std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> dataBuffer,
-					 std::shared_ptr<std::deque<Message>> messageBuffer)
+                     std::shared_ptr<DataBuffer> dataBuffer)
 {
 	std::cout << "WRITER started" << std::endl;
 
 	while (isRunning)
 	{
-		if (!mutex.try_lock_for(std::chrono::milliseconds(10)))
+		if (!dataBuffer->mutex.try_lock_for(std::chrono::milliseconds(10)))
 			continue;
 
-		if (dataBuffer->empty() && messageBuffer->empty())
+		if (dataBuffer->data.empty() && dataBuffer->messages.empty())
 		{
-			mutex.unlock();
+			dataBuffer->mutex.unlock();
 			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 			continue;
 		}
 
-		if (!dataBuffer->empty())
+		if (!dataBuffer->data.empty())
 		{
 			size_t bytesWritten = 0;
-			const auto dataPtr = dataBuffer->front();
-			dataBuffer->pop_front();
+			const auto dataPtr = dataBuffer->data.front();
+			dataBuffer->data.pop_front();
 			const auto data = dataPtr->serialize();
 
 			do
@@ -71,15 +73,15 @@ void PipeWriter::run(const std::string &pipeId,
 					bytesWritten += bytes;
 			} while (bytesWritten < data.size());
 
-			mutex.unlock();
+			dataBuffer->mutex.unlock();
 			continue;
 		}
 
-		if (!messageBuffer->empty())
+		if (!dataBuffer->messages.empty())
 		{
 			size_t bytesWritten = 0;
-			const auto dataPtr = messageBuffer->front();
-			messageBuffer->pop_front();
+			const auto dataPtr = dataBuffer->messages.front();
+			dataBuffer->messages.pop_front();
 			const auto data = dataPtr.serialize();
 
 			do
@@ -89,7 +91,7 @@ void PipeWriter::run(const std::string &pipeId,
 					bytesWritten += bytes;
 			} while (bytesWritten < data.size());
 
-			mutex.unlock();
+			dataBuffer->mutex.unlock();
 			continue;
 		}
 	}

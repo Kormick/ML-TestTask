@@ -1,5 +1,6 @@
 #include "tests/Parser.hpp"
 #include "tests/Pipe.hpp"
+#include "tests/Udp.hpp"
 #include <iostream>
 #include <algorithm>
 
@@ -16,6 +17,7 @@ int main(int argc, char *argv[])
 	bool multithreaded = argExists(argv, argv + argc, "multi");
 	bool profilerRead = argExists(argv, argv + argc, "profilerR");
 	bool profilerWrite = argExists(argv, argv + argc, "profilerW");
+	bool udp = argExists(argv, argv + argc, "udp");
 
 	auto bool_to_str = [](bool res) {
 		return res ? "OK" : "FAILED";
@@ -29,20 +31,44 @@ int main(int argc, char *argv[])
 
 	if (readProcess)
 	{
-		bool res = testPipeProcess(true);
-		std::cout << "PipeProcess READ: " << bool_to_str(res) << std::endl;
+		if (udp)
+		{
+			bool res = testUdp(true);
+			std::cout << "PipeUdp READ: " << bool_to_str(res) << std::endl;
+		}
+		else
+		{
+			bool res = testPipeProcess(true);
+			std::cout << "PipeProcess READ: " << bool_to_str(res) << std::endl;
+		}
 	}
 
 	if (writeProcess)
 	{
-		bool res = testPipeProcess(false);
-		std::cout << "PipeProcess WRITE: " << bool_to_str(res) << std::endl;
+		if (udp)
+		{
+			bool res = testUdp(false);
+			std::cout << "PipeUdp WRITE: " << bool_to_str(res) << std::endl;
+		}
+		else
+		{
+			bool res = testPipeProcess(false);
+			std::cout << "PipeProcess WRITE: " << bool_to_str(res) << std::endl;
+		}
 	}
 
 	if (multithreaded)
 	{
-		bool res = testPipeMultithreaded();
-		std::cout << "PipeMultithreaded: " << bool_to_str(res) << std::endl;
+		if (udp)
+		{
+			bool res = testUdpMultithreaded();
+			std::cout << "UdpMultithreaded: " << bool_to_str(res) << std::endl;
+		}
+		else
+		{
+			bool res = testPipeMultithreaded();
+			std::cout << "PipeMultithreaded: " << bool_to_str(res) << std::endl;
+		}
 	}
 
 	if (profilerRead)

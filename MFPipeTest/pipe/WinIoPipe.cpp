@@ -44,6 +44,7 @@ bool IoPipe::open(const std::string &_pipeId, Mode mode, int32_t timeoutMs /* = 
 		return false;
 
 	const auto start = std::chrono::steady_clock::now();
+	const auto end = start + std::chrono::milliseconds(timeoutMs);
 
 	do
 	{
@@ -76,8 +77,8 @@ bool IoPipe::open(const std::string &_pipeId, Mode mode, int32_t timeoutMs /* = 
 			}
 		}
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
-	} while (std::chrono::steady_clock::now() < start + std::chrono::milliseconds(timeoutMs));
+		std::this_thread::yield();
+	} while (std::chrono::steady_clock::now() < end);
 
 	return false;
 }
@@ -101,8 +102,17 @@ ssize_t IoPipe::read(uint8_t *buf, size_t size)
 	if (fd == INVALID_HANDLE_VALUE)
 		return -1;
 
+	DWORD available = 0;
+	if (!PeekNamedPipe(fd, nullptr, 0, nullptr, &available, nullptr))
+		return 0;
+
+	if (available == 0)
+		return 0;
+
 	DWORD bytesRead = 0;
 	auto res = ReadFile(fd, buf, size, &bytesRead, NULL);
+	if (!res)
+		std::cout << "ERR: " << GetLastError() << std::endl;
 
 	return res ? bytesRead : static_cast<ssize_t>(-1);
 }

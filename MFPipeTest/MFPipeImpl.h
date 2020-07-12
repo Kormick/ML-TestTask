@@ -15,7 +15,9 @@
 
 #ifdef unix
 #include "pipe/UnixIoPipe.hpp"
+#include "udp/UnixIoUdp.hpp"
 #else
+#include "udp/WinIoUdp.hpp"
 #include "pipe/WinIoPipe.hpp"
 #endif
 
@@ -28,6 +30,11 @@
 class MFPipeImpl: public MFPipe
 {
 public:
+	~MFPipeImpl() override
+	{
+		PipeClose();
+	}
+
 	MF_HRESULT PipeInfoGet(
 			/*[out]*/ std::string *pStrPipeName,
 			/*[in]*/ const std::string &strChannel,
@@ -46,7 +53,10 @@ public:
 			return MF_HRESULT::INVALIDARG;
 		}
 
-		io = std::make_shared<IoPipe>();
+		if (strPipeID.find("udp") != std::string::npos)
+			io = std::make_shared<IoUdp>();
+		else
+			io = std::make_shared<IoPipe>();
 
 		if (io->create(strPipeID))
 		{
@@ -66,7 +76,7 @@ public:
 			/*[in]*/ const std::string &strPipeID,
 			/*[in]*/ int _nMaxBuffers,
 			/*[in]*/ const std::string &strHints,
-			/*[in]*/ int _nMaxWaitMs = 1000) override
+			/*[in]*/ int _nMaxWaitMs = 10000) override
 	{
 		if (strPipeID.empty())
 		{
@@ -79,7 +89,12 @@ public:
 		if (strHints.find("R") != std::string::npos)
 		{
 			if (!io)
-				io = std::make_shared<IoPipe>();
+			{
+				if (strPipeID.find("udp") != std::string::npos)
+					io = std::make_shared<IoUdp>();
+				else
+					io = std::make_shared<IoPipe>();
+			}
 
 			if (!io->open(pipeId, IoInterface::Mode::READ, _nMaxWaitMs))
 			{
@@ -87,9 +102,8 @@ public:
 				return MF_HRESULT::RES_FALSE;
 			}
 
-			readDataBuffer = std::make_shared<std::deque<std::shared_ptr<MF_BASE_TYPE>>>();
-			readMessageBuffer = std::make_shared<std::deque<Message>>();
-			reader = std::make_unique<PipeReader>(io, pipeId, _nMaxBuffers, readDataBuffer, readMessageBuffer);
+			readDataBuffer = std::make_shared<DataBuffer>();
+			reader = std::make_unique<PipeReader>(io, pipeId, _nMaxBuffers, readDataBuffer);
 			reader->start();
 		}
 		if (strHints.find("W") != std::string::npos)
@@ -100,9 +114,9 @@ public:
 				return MF_HRESULT::RES_FALSE;
 			}
 
-			writeDataBuffer = std::make_shared<std::deque<std::shared_ptr<MF_BASE_TYPE>>>();
-			writeMessageBuffer = std::make_shared<std::deque<Message>>();
-			writer = std::make_unique<PipeWriter>(io, pipeId, writeDataBuffer, writeMessageBuffer);
+			maxBuffers = _nMaxBuffers;
+			writeDataBuffer = std::make_shared<DataBuffer>();
+			writer = std::make_unique<PipeWriter>(io, pipeId, writeDataBuffer);
 			writer->start();
 		}
 
@@ -115,18 +129,28 @@ public:
 			/*[in]*/ int _nMaxWaitMs,
 			/*[in]*/ const std::string &strHints) override
 	{
-		if (!writeMutex.try_lock_for(std::chrono::milliseconds(_nMaxWaitMs)))
+		const auto start = std::chrono::steady_clock::now();
+		const auto end = start + std::chrono::milliseconds(_nMaxWaitMs);
+
+		do
 		{
-			std::cout << "Failed to add buffer to write queue." << std::endl;
-			return MF_HRESULT::RES_FALSE;
-		}
+			if (!writeDataBuffer->mutex.try_lock_until(end))
+				break;
 
-		// TODO check buffer size
+			if (writeDataBuffer->data.size() >= maxBuffers)
+			{
+				writeDataBuffer->mutex.unlock();
+				std::this_thread::yield();
+				continue;
+			}
 
-		writeDataBuffer->push_back(pBufferOrFrame);
-		writeMutex.unlock();
+			writeDataBuffer->data.push_back(pBufferOrFrame);
+			writeDataBuffer->mutex.unlock();
+			return MF_HRESULT::RES_OK;
+		} while (std::chrono::steady_clock::now() < end);
 
-		return MF_HRESULT::RES_OK;
+		std::cout << "Timeout on adding buffer to write queue" << std::endl;
+		return MF_HRESULT::RES_FALSE;
 	}
 
 	MF_HRESULT PipeGet(
@@ -136,27 +160,27 @@ public:
 			/*[in]*/ const std::string &strHints) override
 	{
 		auto start = std::chrono::steady_clock::now();
-
-		if (!readMutex.try_lock_for(std::chrono::milliseconds(_nMaxWaitMs)))
-		{
-			std::cout << "Failed to get buffer from read queue" << std::endl;
-			return MF_HRESULT::RES_FALSE;
-		}
+		auto end = start + std::chrono::milliseconds(_nMaxWaitMs);
 
 		do
 		{
-			if (readDataBuffer->empty())
+			if (!readDataBuffer->mutex.try_lock_until(end))
+				break;
+
+			if (readDataBuffer->data.empty())
 			{
-				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+				readDataBuffer->mutex.unlock();
+				std::this_thread::yield();
 				continue;
 			}
 
-			pBufferOrFrame = readDataBuffer->front();
-			readDataBuffer->pop_front();
-			readMutex.unlock();
+			pBufferOrFrame = readDataBuffer->data.front();
+			readDataBuffer->data.pop_front();
+			readDataBuffer->mutex.unlock();
 			return MF_HRESULT::RES_OK;
-		} while (std::chrono::steady_clock::now() < start + std::chrono::milliseconds(_nMaxWaitMs));
+		} while (std::chrono::steady_clock::now() < end);
 
+		std::cout << "Timeout on getting buffer from read queue" << std::endl;
 		return MF_HRESULT::RES_FALSE;
 	}
 
@@ -176,18 +200,28 @@ public:
 			/*[in]*/ const std::string &strEventParam,
 			/*[in]*/ int _nMaxWaitMs) override
 	{
-		if (!writeMutex.try_lock_for(std::chrono::milliseconds(_nMaxWaitMs)))
+		const auto start = std::chrono::steady_clock::now();
+		const auto end = start + std::chrono::milliseconds(_nMaxWaitMs);
+
+		do
 		{
-			std::cout << "Failed to add message to write queue" << std::endl;
-			return MF_HRESULT::RES_FALSE;
-		}
+			if (!writeDataBuffer->mutex.try_lock_until(end))
+				break;
 
-		// TODO check buffer size
+			if (writeDataBuffer->messages.size() >= maxBuffers)
+			{
+				writeDataBuffer->mutex.unlock();
+				std::this_thread::yield();
+				continue;
+			}
 
-		writeMessageBuffer->push_back({ strEventName, strEventParam });
-		writeMutex.unlock();
+			writeDataBuffer->messages.push_back({ strEventName, strEventParam });
+			writeDataBuffer->mutex.unlock();
+			return MF_HRESULT::RES_OK;
+		} while (std::chrono::steady_clock::now() < end);
 
-		return MF_HRESULT::RES_OK;
+		std::cout << "Timeout on adding message to write queue" << std::endl;
+		return MF_HRESULT::RES_FALSE;
 	}
 
 	MF_HRESULT PipeMessageGet(
@@ -197,29 +231,29 @@ public:
 			/*[in]*/ int _nMaxWaitMs) override
 	{
 		auto start = std::chrono::steady_clock::now();
-
-		if (!readMutex.try_lock_for(std::chrono::milliseconds(_nMaxWaitMs)))
-		{
-			std::cout << "Failed to get message from read queue" << std::endl;
-			return MF_HRESULT::RES_FALSE;
-		}
+		auto end = start + std::chrono::milliseconds(_nMaxWaitMs);
 
 		do
 		{
-			if (readMessageBuffer->empty())
+			if (!readDataBuffer->mutex.try_lock_until(end))
+				break;
+
+			if (readDataBuffer->messages.empty())
 			{
-				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+				readDataBuffer->mutex.unlock();
+				std::this_thread::yield();
 				continue;
 			}
 
-			Message mes = readMessageBuffer->front();
-			readMessageBuffer->pop_front();
+			Message mes = readDataBuffer->messages.front();
+			readDataBuffer->messages.pop_front();
 			*pStrEventName = mes.name;
 			*pStrEventParam = mes.param;
-			readMutex.unlock();
+			readDataBuffer->mutex.unlock();
 			return MF_HRESULT::RES_OK;
-		} while (std::chrono::steady_clock::now() < start + std::chrono::milliseconds(_nMaxWaitMs));
+		} while (std::chrono::steady_clock::now() < end);
 
+		std::cout << "Timeout on getting message from read queue" << std::endl;
 		return MF_HRESULT::RES_FALSE;
 	}
 
@@ -240,17 +274,13 @@ public:
 
 private:
 	std::string pipeId;
+	int32_t maxBuffers;
 	MF_PIPE_INFO pipeInfo;
 
 	std::shared_ptr<IoInterface> io;
 
-	std::timed_mutex readMutex;
-	std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> readDataBuffer;
-	std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> writeDataBuffer;
-
-	std::timed_mutex writeMutex;
-	std::shared_ptr<std::deque<Message>> readMessageBuffer;
-	std::shared_ptr<std::deque<Message>> writeMessageBuffer;
+	std::shared_ptr<DataBuffer> readDataBuffer;
+	std::shared_ptr<DataBuffer> writeDataBuffer;
 
 	std::unique_ptr<PipeReader> reader;
 	std::unique_ptr<PipeWriter> writer;

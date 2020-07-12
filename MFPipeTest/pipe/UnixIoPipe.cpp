@@ -1,10 +1,13 @@
 #include "UnixIoPipe.hpp"
 
 #include <chrono>
+#include <iostream>
 #include <thread>
 #include "fcntl.h"
+#include <string.h>
 #include "sys/stat.h"
 #include "unistd.h"
+#include "poll.h"
 
 IoPipe::IoPipe()
 	: fd(-1)
@@ -30,7 +33,7 @@ bool IoPipe::create(const std::string &pipeId)
 
 bool IoPipe::open(const std::string &pipeId, Mode mode, int32_t timeoutMs /* = 1000 */)
 {
-	if (fd != -1 || pipeId.empty())
+	if (pipeId.empty())
 		return false;
 
 	const auto start = std::chrono::steady_clock::now();
@@ -44,7 +47,7 @@ bool IoPipe::open(const std::string &pipeId, Mode mode, int32_t timeoutMs /* = 1
 		if (fd != -1)
 			return true;
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		std::this_thread::yield();
 	} while (std::chrono::steady_clock::now() < start + std::chrono::milliseconds(timeoutMs));
 
 	return false;

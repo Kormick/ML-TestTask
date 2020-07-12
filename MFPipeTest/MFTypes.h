@@ -7,6 +7,8 @@
 #include <memory>
 #include <iostream>
 #include <cmath>
+#include <mutex>
+#include <deque>
 
 typedef long long int REFERENCE_TIME;
 
@@ -26,6 +28,8 @@ enum class DataType
 	BUFFER,
 	MESSAGE,
 };
+
+static constexpr uint32_t DATA_SYNC = 0xFBFCFDFE;
 
 typedef struct M_TIME
 {
@@ -149,6 +153,7 @@ typedef struct MF_FRAME: public MF_BASE_TYPE
 			buf.insert(buf.end(), bytes, bytes + sizeof(data));
 		};
 
+		to_bytes(DATA_SYNC);
 		to_bytes(static_cast<uint8_t>(DataType::FRAME));
 		to_bytes(time);
 		to_bytes(av_props);
@@ -238,6 +243,7 @@ typedef struct MF_BUFFER: public MF_BASE_TYPE
 			buf.insert(buf.end(), bytes, bytes + sizeof(data));
 		};
 
+		to_bytes(DATA_SYNC);
 		to_bytes(static_cast<uint8_t>(DataType::BUFFER));
 		to_bytes(flags);
 
@@ -290,6 +296,7 @@ struct Message
 			buf.insert(buf.end(), bytes, bytes + sizeof(data));
 		};
 
+		to_bytes(DATA_SYNC);
 		to_bytes(static_cast<uint8_t>(DataType::MESSAGE));
 
 		to_bytes(name.size());
@@ -319,6 +326,19 @@ struct Message
 
 		return mes;
 	}
+};
+
+struct DataBuffer
+{
+	std::timed_mutex mutex;
+	std::deque<std::shared_ptr<MF_BASE_TYPE>> data;
+	std::deque<Message> messages;
+};
+
+struct MessageBuffer
+{
+	std::timed_mutex mutex;
+	std::deque<Message> data;
 };
 
 #endif

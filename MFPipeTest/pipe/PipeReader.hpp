@@ -16,17 +16,14 @@ public:
 	PipeReader(std::shared_ptr<IoInterface> io,
 			   const std::string &pipeId,
 			   size_t maxBuffers,
-			   std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> dataBuffer,
-			   std::shared_ptr<std::deque<Message>> messageBuffer);
+			   std::shared_ptr<DataBuffer> dataBuffer);
 
 	~PipeReader();
 
 	void start();
 	void stop();
 
-	void run(const std::string &pipeId,
-			 std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> dataBuffer,
-			 std::shared_ptr<std::deque<Message>> messageBuffer);
+	void run(const std::string &pipeId, std::shared_ptr<DataBuffer> dataBuffer);
 
 private:
 	volatile bool isRunning;
@@ -35,11 +32,9 @@ private:
 	size_t maxBuffers;
 
 	std::unique_ptr<std::thread> thread;
-	std::timed_mutex mutex;
-
 	std::shared_ptr<IoInterface> io;
-	std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> dataBuffer;
-	std::shared_ptr<std::deque<Message>> messageBuffer;
+	std::shared_ptr<DataBuffer> dataBuffer;
+//	std::shared_ptr<MessageBuffer> messageBuffer;
 	PipeParser parser;
 };
 

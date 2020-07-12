@@ -9,6 +9,8 @@ public:
 	enum class State
 	{
 		IDLE = 0x00,
+		SYNC,
+		DATA_TYPE,
 
 		FRAME_TIME,
 		FRAME_AV_PROPS,
@@ -41,9 +43,13 @@ public:
 	State getState() const;
 	size_t parse(const std::vector<uint8_t> &rawData, size_t startPos);
 
+	size_t parse(const uint8_t *rawData, size_t size);
+
 private:
 	State state;
 	DataType type;
+	uint8_t syncBytes[4];
+	uint8_t syncCount;
 	size_t chunkSize;
 	std::vector<uint8_t> data;
 };

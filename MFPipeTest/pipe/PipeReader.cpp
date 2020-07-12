@@ -6,15 +6,13 @@
 PipeReader::PipeReader(std::shared_ptr<IoInterface> io,
 					   const std::string &pipeId,
 					   size_t maxBuffers,
-					   std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> dataBuffer,
-					   std::shared_ptr<std::deque<Message>> messageBuffer)
+					   std::shared_ptr<DataBuffer> dataBuffer)
 	: isRunning(false),
 	  pipeId(pipeId),
 	  fd(-1),
 	  maxBuffers(maxBuffers),
 	  io(io),
-	  dataBuffer(dataBuffer),
-	  messageBuffer(messageBuffer)
+	  dataBuffer(dataBuffer)
 {}
 
 PipeReader::~PipeReader()
@@ -26,48 +24,46 @@ PipeReader::~PipeReader()
 void PipeReader::start()
 {
 	isRunning = true;
-	thread.reset(new std::thread(&PipeReader::run, this, std::cref(pipeId), dataBuffer, messageBuffer));
+	thread.reset(new std::thread(&PipeReader::run, this, std::cref(pipeId), dataBuffer));
 }
 
 void PipeReader::stop()
 {
-	{
-		std::unique_lock<std::timed_mutex> lock(mutex);
-		isRunning = false;
-	}
-	thread->join();
+	isRunning = false;
+	if (thread->joinable())
+		thread->join();
 }
 
-void PipeReader::run(const std::string &pipeId,
-					 std::shared_ptr<std::deque<std::shared_ptr<MF_BASE_TYPE>>> dataBuffer,
-					 std::shared_ptr<std::deque<Message>> messageBuffer)
+void PipeReader::run(const std::string &pipeId, std::shared_ptr<DataBuffer> dataBuffer)
 {
 	std::cout << "READER started" << std::endl;
 
+	uint8_t buffer[512 * 1024] = { 0 };
+	size_t parsedBytes = 0;
+	ssize_t readBytes = 0;
+
 	while (isRunning)
 	{
-		if (!mutex.try_lock_for(std::chrono::milliseconds(10)))
+		if (!dataBuffer->mutex.try_lock_for(std::chrono::milliseconds(10)))
 			continue;
 
-		if (dataBuffer->size() >= maxBuffers || messageBuffer->size() >= maxBuffers)
+		if (dataBuffer->data.size() >= maxBuffers || dataBuffer->messages.size() >= maxBuffers)
 		{
-			mutex.unlock();
-			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			dataBuffer->mutex.unlock();
+			std::this_thread::yield();
 			continue;
 		}
 
 		bool doRead = true;
 		while (doRead)
 		{
-			uint8_t byte = 0;
-			std::vector<uint8_t> data;
+			if (readBytes <= 0)
+				readBytes = io->read(buffer, 512 * 1024);
 
-			auto readBytes = io->read(&byte, sizeof(byte));
 			if (readBytes <= 0)
 				break;
 
-			data.push_back(byte);
-			parser.parse(data, 0);
+			parsedBytes += parser.parse(buffer + parsedBytes, readBytes - parsedBytes);
 
 			switch (parser.getState())
 			{
@@ -76,9 +72,8 @@ void PipeReader::run(const std::string &pipeId,
 					const auto data = parser.getData();
 
 					MF_BUFFER buffer;
-					dataBuffer->push_back(std::shared_ptr<MF_BASE_TYPE>(buffer.deserialize(data)));
+					dataBuffer->data.push_back(std::shared_ptr<MF_BASE_TYPE>(buffer.deserialize(data)));
 					parser.reset();
-					doRead = false;
 					break;
 				}
 				case PipeParser::State::FRAME_READY:
@@ -86,9 +81,8 @@ void PipeReader::run(const std::string &pipeId,
 					const auto data = parser.getData();
 
 					MF_FRAME frame;
-					dataBuffer->push_back(std::shared_ptr<MF_BASE_TYPE>(frame.deserialize(data)));
+					dataBuffer->data.push_back(std::shared_ptr<MF_BASE_TYPE>(frame.deserialize(data)));
 					parser.reset();
-					doRead = false;
 					break;
 				}
 				case PipeParser::State::MESSAGE_READY:
@@ -96,82 +90,22 @@ void PipeReader::run(const std::string &pipeId,
 					const auto data = parser.getData();
 
 					Message message;
-					messageBuffer->push_back(message.deserialize(data));
+					dataBuffer->messages.push_back(message.deserialize(data));
 					parser.reset();
-					doRead = false;
 					break;
 				}
 				default:
 					break;
 			}
+
+			if (static_cast<size_t>(readBytes) == parsedBytes)
+			{
+				readBytes = 0;
+				parsedBytes = 0;
+				break;
+			}
 		}
 
-		//		if (fd == -1)
-		//		{
-		//			fd = open(pipeId.c_str(), O_RDONLY);
-		//			if (fd == -1)
-		//			{
-		//				std::cout << errno << std::endl;
-		//				mutex.unlock();
-		//				std::this_thread::sleep_for(std::chrono::milliseconds(1));
-		//				continue;
-		//			}
-		//			else
-		//			{
-		//				std::cout << "READER opened pipe " << fd << std::endl;
-		//			}
-		//		}
-
-		//		bool doRead = true;
-		//		while (doRead)
-		//		{
-		//			uint8_t byte = 0;
-		//			std::vector<uint8_t> data;
-
-		//			auto readBytes = read(fd, &byte, sizeof(uint8_t));
-		//			if (readBytes <= 0)
-		//				break;
-
-		//			data.push_back(byte);
-		//			parser.parse(data, 0);
-
-		//			switch (parser.getState())
-		//			{
-		//				case PipeParser::State::BUFFER_READY:
-		//				{
-		//					const auto data = parser.getData();
-
-		//					MF_BUFFER buffer;
-		//					dataBuffer->push_back(std::shared_ptr<MF_BASE_TYPE>(buffer.deserialize(data)));
-		//					parser.reset();
-		//					doRead = false;
-		//					break;
-		//				}
-		//				case PipeParser::State::FRAME_READY:
-		//				{
-		//					const auto data = parser.getData();
-
-		//					MF_FRAME frame;
-		//					dataBuffer->push_back(std::shared_ptr<MF_BASE_TYPE>(frame.deserialize(data)));
-		//					parser.reset();
-		//					doRead = false;
-		//					break;
-		//				}
-		//				case PipeParser::State::MESSAGE_READY:
-		//				{
-		//					const auto data = parser.getData();
-
-		//					Message message;
-		//					messageBuffer->push_back(message.deserialize(data));
-		//					parser.reset();
-		//					doRead = false;
-		//					break;
-		//				}
-		//				default:
-		//					break;
-		//			}
-		//		}
-
-		mutex.unlock();
+		dataBuffer->mutex.unlock();
 	}
 }

@@ -1,11 +1,5 @@
-#ifndef PIPEPROCESS_HPP
-#define PIPEPROCESS_HPP
-
-#include <chrono>
-#include <future>
-
-#include "../MFPipeImpl.h"
-#include "../MFTypes.h"
+#ifndef UDP_HPP
+#define UDP_HPP
 
 #define PACKETS_COUNT	(8)
 
@@ -13,18 +7,20 @@
 #define SIZEOF_ARRAY(arr)	static_cast<size_t>(sizeof(arr)/sizeof((arr)[0]))
 #endif // SIZEOF_ARRAY
 
-#ifdef unix
-static constexpr auto pipeName = "./testPipe";
-#else
-static constexpr auto pipeName = "\\\\.\\pipe\\testPipe";
-#endif
+#include <future>
+#include "MFPipeImpl.h"
+#include "MFTypes.h"
 
-bool testBuffer(bool read)
+static constexpr auto udpAddr = "udp://127.0.0.10:49152";
+static constexpr auto udpAddr1 = "udp://127.0.0.11:49152";
+
+bool testUdpBuffer(bool read)
 {
 	std::shared_ptr<MF_BUFFER> arrBuffersIn[PACKETS_COUNT];
 	for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
 	{
-		size_t cbSize = 128 * 1024 + rand() % (256 * 1024);
+//		size_t cbSize = 128 * 1024 + rand() % (256 * 1024);
+		size_t cbSize = 32 * 1024;
 		arrBuffersIn[i] = std::make_shared<MF_BUFFER>();
 
 		arrBuffersIn[i]->flags = eMFBF_Buffer;
@@ -41,9 +37,9 @@ bool testBuffer(bool read)
 		std::cout << "WRITE" << std::endl;
 
 		MFPipeImpl writePipe;
-		if (writePipe.PipeCreate(pipeName, "") == MF_HRESULT::RES_OK)
+		if (writePipe.PipeCreate(udpAddr, "") == MF_HRESULT::RES_OK)
 		{
-			if (writePipe.PipeOpen(pipeName, 32, "W") == MF_HRESULT::RES_OK)
+			if (writePipe.PipeOpen(udpAddr, 32, "W") == MF_HRESULT::RES_OK)
 			{
 				for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
 				{
@@ -74,7 +70,7 @@ bool testBuffer(bool read)
 		std::cout << "READ" << std::endl;
 
 		MFPipeImpl readPipe;
-		if (readPipe.PipeOpen(pipeName, 32, "R") == MF_HRESULT::RES_OK)
+		if (readPipe.PipeOpen(udpAddr, 32, "R") == MF_HRESULT::RES_OK)
 		{
 			for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
 			{
@@ -104,7 +100,7 @@ bool testBuffer(bool read)
 	return testRes;
 }
 
-bool testFrame(bool read)
+bool testUdpFrame(bool read)
 {
 	std::shared_ptr<MF_FRAME> arrBuffersIn[PACKETS_COUNT];
 	for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
@@ -145,9 +141,9 @@ bool testFrame(bool read)
 		std::cout << "WRITE" << std::endl;
 
 		MFPipeImpl writePipe;
-		if (writePipe.PipeCreate(pipeName, "") == MF_HRESULT::RES_OK)
+		if (writePipe.PipeCreate(udpAddr, "") == MF_HRESULT::RES_OK)
 		{
-			if (writePipe.PipeOpen(pipeName, 32, "W") == MF_HRESULT::RES_OK)
+			if (writePipe.PipeOpen(udpAddr, 32, "W") == MF_HRESULT::RES_OK)
 			{
 				for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
 				{
@@ -179,7 +175,7 @@ bool testFrame(bool read)
 		std::cout << "READ" << std::endl;
 
 		MFPipeImpl readPipe;
-		if (readPipe.PipeOpen(pipeName, 32, "R") == MF_HRESULT::RES_OK)
+		if (readPipe.PipeOpen(udpAddr, 32, "R") == MF_HRESULT::RES_OK)
 		{
 			for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
 			{
@@ -209,7 +205,7 @@ bool testFrame(bool read)
 	return testRes;
 }
 
-bool testMessage(bool read)
+bool testUdpMessage(bool read)
 {
 	std::string pstrEvents[] = { "event1", "event2", "event3", "event4",
 								 "event5", "event6", "event7", "event8" };
@@ -223,9 +219,9 @@ bool testMessage(bool read)
 		std::cout << "WRITE" << std::endl;
 
 		MFPipeImpl writePipe;
-		if (writePipe.PipeCreate(pipeName, "") == MF_HRESULT::RES_OK)
+		if (writePipe.PipeCreate(udpAddr, "") == MF_HRESULT::RES_OK)
 		{
-			if (writePipe.PipeOpen(pipeName, 32, "W") == MF_HRESULT::RES_OK)
+			if (writePipe.PipeOpen(udpAddr, 32, "W") == MF_HRESULT::RES_OK)
 			{
 				for (size_t i = 0; i < SIZEOF_ARRAY(pstrEvents); ++i)
 				{
@@ -259,9 +255,9 @@ bool testMessage(bool read)
 		std::cout << "READ" << std::endl;
 
 		MFPipeImpl readPipe;
-		readPipe.PipeOpen(pipeName, 0, "");
+		readPipe.PipeOpen(udpAddr, 0, "");
 
-		if (readPipe.PipeOpen(pipeName, 32, "R") == MF_HRESULT::RES_OK)
+		if (readPipe.PipeOpen(udpAddr, 32, "R") == MF_HRESULT::RES_OK)
 		{
 			for (size_t i = 0; i < SIZEOF_ARRAY(pstrEvents); ++i)
 			{
@@ -292,7 +288,7 @@ bool testMessage(bool read)
 	return testRes;
 }
 
-bool testAll(bool read)
+bool testUdpAll(bool read)
 {
 	std::shared_ptr<MF_BUFFER> arrBuffersIn[PACKETS_COUNT];
 	for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
@@ -320,9 +316,9 @@ bool testAll(bool read)
 	{
 		// Write pipe
 		MFPipeImpl MFPipe_Write;
-		if (MFPipe_Write.PipeCreate(pipeName, "") == MF_HRESULT::RES_OK)
+		if (MFPipe_Write.PipeCreate(udpAddr, "") == MF_HRESULT::RES_OK)
 		{
-			if (MFPipe_Write.PipeOpen(pipeName, 32, "W") == MF_HRESULT::RES_OK)
+			if (MFPipe_Write.PipeOpen(udpAddr, 32, "W") == MF_HRESULT::RES_OK)
 			{
 				for (int i = 0; i < 8; ++i)
 				{
@@ -361,7 +357,7 @@ bool testAll(bool read)
 	{
 		// Read pipe
 		MFPipeImpl MFPipe_Read;
-		if (MFPipe_Read.PipeOpen(pipeName, 32, "R") == MF_HRESULT::RES_OK)
+		if (MFPipe_Read.PipeOpen(udpAddr, 32, "R") == MF_HRESULT::RES_OK)
 		{
 			for (int i = 0; i < 8; ++i)
 			{
@@ -376,9 +372,11 @@ bool testAll(bool read)
 
 				MFPipe_Read.PipeMessageGet("ch1", &arrStrings[0], &arrStrings[1], 1000);
 				MFPipe_Read.PipeMessageGet("ch2", &arrStrings[2], &arrStrings[3], 1000);
+				//		MFPipe_Read.PipeMessageGet("ch2", NULL, &arrStrings[2], 100);
 
 				MFPipe_Read.PipeGet("ch1", arrBuffersOut[2], 1000, "");
 				MFPipe_Read.PipeGet("ch2", arrBuffersOut[3], 1000, "");
+				//		MFPipe_Read.PipeGet("ch2", arrBuffersOut[6], 100, "");
 
 				// TODO: Your test code here
 
@@ -430,16 +428,16 @@ bool testAll(bool read)
 	return testRes;
 }
 
-bool testBufferMultithreadedWrite(std::shared_ptr<MF_BUFFER> *buffers, size_t size)
+bool testUdpBufferMultithreadedWrite(std::shared_ptr<MF_BUFFER> *buffers, size_t size)
 {
 	std::cout << "WRITE" << std::endl;
 
 	bool testRes = true;
 
 	MFPipeImpl writePipe;
-	if (writePipe.PipeCreate(pipeName, "") == MF_HRESULT::RES_OK)
+	if (writePipe.PipeCreate(udpAddr, "") == MF_HRESULT::RES_OK)
 	{
-		if (writePipe.PipeOpen(pipeName, 32, "W") == MF_HRESULT::RES_OK)
+		if (writePipe.PipeOpen(udpAddr, 32, "W") == MF_HRESULT::RES_OK)
 		{
 			for (size_t i = 0; i < size; ++i)
 			{
@@ -472,14 +470,14 @@ bool testBufferMultithreadedWrite(std::shared_ptr<MF_BUFFER> *buffers, size_t si
 	return testRes;
 }
 
-bool testBufferMultithreadedRead(std::shared_ptr<MF_BUFFER> *buffers, size_t size)
+bool testUdpBufferMultithreadedRead(std::shared_ptr<MF_BUFFER> *buffers, size_t size)
 {
 	std::cout << "READ" << std::endl;
 
 	bool testRes = true;
 
 	MFPipeImpl readPipe;
-	if (readPipe.PipeOpen(pipeName, 32, "R") == MF_HRESULT::RES_OK)
+	if (readPipe.PipeOpen(udpAddr, 32, "R") == MF_HRESULT::RES_OK)
 	{
 		for (size_t i = 0; i < size; ++i)
 		{
@@ -508,7 +506,7 @@ bool testBufferMultithreadedRead(std::shared_ptr<MF_BUFFER> *buffers, size_t siz
 	return testRes;
 }
 
-bool testBufferMultithreaded()
+bool testUdpBufferMultithreaded()
 {
 	std::shared_ptr<MF_BUFFER> arrBuffersIn[PACKETS_COUNT];
 	for (size_t i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i)
@@ -525,229 +523,31 @@ bool testBufferMultithreaded()
 		}
 	}
 
-	auto writeFut = std::async(&testBufferMultithreadedWrite, arrBuffersIn, SIZEOF_ARRAY(arrBuffersIn));
-	auto readFut = std::async(&testBufferMultithreadedRead, arrBuffersIn, SIZEOF_ARRAY(arrBuffersIn));
+	auto writeFut = std::async(&testUdpBufferMultithreadedWrite, arrBuffersIn, SIZEOF_ARRAY(arrBuffersIn));
+	auto readFut = std::async(&testUdpBufferMultithreadedRead, arrBuffersIn, SIZEOF_ARRAY(arrBuffersIn));
 
 	return writeFut.get() && readFut.get();
 }
 
-bool testBufferMultithreaded2Write(MFPipeImpl *pipe, std::shared_ptr<MF_BUFFER> buffer)
-{
-	for (auto i = 0; i < 128; ++i)
-	{
-		if (pipe->PipePut("", buffer, 1000, "") != MF_HRESULT::RES_OK)
-		{
-			std::cout << "Write failed on " << i << std::endl;
-			return false;
-		}
-
-		std::cout << "Write " << i << std::endl;
-	}
-
-	return true;
-}
-
-bool testBufferMultithreaded2Read(MFPipeImpl *pipe, std::shared_ptr<MF_BUFFER> buffer)
-{
-	for (auto i = 0; i < 128; ++i)
-	{
-		std::shared_ptr<MF_BASE_TYPE> out;
-		if (pipe->PipeGet("", out, 1000, "") != MF_HRESULT::RES_OK)
-		{
-			std::cout << "Read failed on " << i << std::endl;
-			return false;
-		}
-
-		if (out == nullptr)
-		{
-			std::cout << "Returned empty data on " << i << std::endl;
-			return false;
-		}
-
-		const auto dp = dynamic_cast<MF_BUFFER *>(buffer.get());
-		const auto bp = dynamic_cast<MF_BUFFER *>(out.get());
-
-		if (*dp != *bp)
-		{
-			std::cout << "Read invalid data on " << i << std::endl;
-			return false;
-		}
-		else
-		{
-			std::cout << "Read " << i << std::endl;
-		}
-	}
-
-	return true;
-}
-
-bool testBufferMultithreaded2OpenWrite(MFPipeImpl *pipe)
-{
-	if (pipe->PipeCreate(pipeName, "") != MF_HRESULT::RES_OK)
-	{
-		std::cout << "Failed to create write pipe" << std::endl;
-		return false;
-	}
-	if (pipe->PipeOpen(pipeName, 32, "W") != MF_HRESULT::RES_OK)
-	{
-		std::cout << "Failed to open write pipe" << std::endl;
-		return false;
-	}
-
-	return true;
-}
-
-bool testBufferMultithreaded2OpenRead(MFPipeImpl *pipe)
-{
-	if (pipe->PipeOpen(pipeName, 32, "R") != MF_HRESULT::RES_OK)
-	{
-		std::cout << "Failed to open read pipe" << std::endl;
-		return false;
-	}
-
-	return true;
-}
-
-bool testBufferMultithreaded2()
-{
-	std::shared_ptr<MF_BUFFER> buffer = std::make_shared<MF_BUFFER>();
-	buffer->flags = eMFBF_Buffer;
-	for (auto i = 0; i < 64 * 1024; ++i)
-		buffer->data.push_back(i);
-
-	MFPipeImpl writePipe;
-	MFPipeImpl readPipe;
-
-	auto writeOpenFut = std::async(&testBufferMultithreaded2OpenWrite, &writePipe);
-	auto readOpenFut = std::async(&testBufferMultithreaded2OpenRead, &readPipe);
-
-	if (!writeOpenFut.get() || !readOpenFut.get())
-		return false;
-
-	auto writeFut0 = std::async(&testBufferMultithreaded2Write, &writePipe, buffer);
-	auto writeFut1 = std::async(&testBufferMultithreaded2Write, &writePipe, buffer);
-	auto readFut0 = std::async(&testBufferMultithreaded2Read, &readPipe, buffer);
-	auto readFut1 = std::async(&testBufferMultithreaded2Read, &readPipe, buffer);
-
-	return writeFut0.get() && writeFut1.get() && readFut0.get() && readFut1.get();
-}
-
-bool testPerformance(bool read)
-{
-	std::shared_ptr<MF_BUFFER> buffer = std::make_shared<MF_BUFFER>();
-	buffer->flags = eMFBF_Buffer;
-	buffer->data.reserve(1024 * 1024);
-	for (auto i = 0; i < 1024 * 1024; ++i)
-		buffer->data.push_back(i);
-
-	bool testRes = true;
-
-	if (!read)
-	{
-		auto start = std::chrono::steady_clock::now();
-
-		MFPipeImpl writePipe;
-		if (writePipe.PipeCreate(pipeName, "") == MF_HRESULT::RES_OK)
-		{
-			if (writePipe.PipeOpen(pipeName, 32, "W") == MF_HRESULT::RES_OK)
-			{
-				for (auto i = 0; i < 1024 && testRes; ++i)
-				{
-					if (writePipe.PipePut("", buffer, 10000, "") != MF_HRESULT::RES_OK)
-					{
-						std::cout << "Failed to put buffer in write queue" << std::endl;
-						testRes = false;
-					}
-				}
-
-				writePipe.PipeClose();
-			}
-			else
-			{
-				std::cout << "Failed to open pipe on write" << std::endl;
-				testRes = false;
-			}
-		}
-		else
-		{
-			std::cout << "Failed to create pipe" << std::endl;
-		}
-
-		auto end = std::chrono::steady_clock::now();
-
-		auto time = end - start;
-		std::cout << "Written 1Gb in " << std::chrono::duration_cast<std::chrono::seconds>(time).count() << std::endl;
-	}
-	else
-	{
-		auto start = std::chrono::steady_clock::now();
-
-		MFPipeImpl readPipe;
-		if (readPipe.PipeOpen(pipeName, 32, "R") == MF_HRESULT::RES_OK)
-		{
-			for (auto i = 0; i < 1024 && testRes; ++i)
-			{
-				std::shared_ptr<MF_BASE_TYPE> buf;
-				auto res = readPipe.PipeGet("", buf, 10000, "");
-
-				if (res != MF_HRESULT::RES_OK)
-				{
-					std::cout << "Failed to get buffer from read queue" << std::endl;
-					testRes = false;
-				}
-				else if (*dynamic_cast<MF_BUFFER *>(buf.get()) != *buffer)
-				{
-					std::cout << "Read invalid data" << std::endl;
-					testRes = false;
-				}
-			}
-
-			readPipe.PipeClose();
-		}
-		else
-		{
-			std::cout << "Failed to open pipe on read" << std::endl;
-			testRes = false;
-		}
-
-		auto end = std::chrono::steady_clock::now();
-
-		auto time = end - start;
-		std::cout << "Read 1Gb in " << std::chrono::duration_cast<std::chrono::seconds>(time).count() << std::endl;
-	}
-
-	return testRes;
-}
-
-bool testPipeProcess(bool read)
+bool testUdp(bool read)
 {
 	bool res = true;
 
-	res = res && testBuffer(read);
-	res = res && testFrame(read);
-	res = res && testMessage(read);
-	res = res && testAll(read);
+	res = res && testUdpBuffer(read);
+	res = res && testUdpFrame(read);
+	res = res && testUdpMessage(read);
+	res = res && testUdpAll(read);
 
 	return res;
 }
 
-bool testPipeMultithreaded()
+bool testUdpMultithreaded()
 {
 	bool res = true;
 
-//	res = res && testBufferMultithreaded();
-	res = res && testBufferMultithreaded2();
+	res = res && testUdpBufferMultithreaded();
 
 	return res;
 }
 
-bool testPipePerformance(bool read)
-{
-	bool res = true;
-
-	res = res && testPerformance(read);
-
-	return res;
-}
-
-#endif // PIPEPROCESS_HPP
+#endif // UDP_HPP

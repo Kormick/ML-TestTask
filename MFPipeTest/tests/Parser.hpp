@@ -55,7 +55,7 @@ bool testParserFrame()
 
 	const auto data = parser.getData();
 
-	bytes.erase(bytes.begin());
+	bytes.erase(bytes.begin(), bytes.begin() + 5);
 	if (bytes != data)
 	{
 		std::cout << "Frame parser failed: " << std::endl;
@@ -116,7 +116,7 @@ bool testParserBuffer()
 
 	const auto data = parser.getData();
 
-	bytes.erase(bytes.begin());
+	bytes.erase(bytes.begin(), bytes.begin() + 5);
 	if (bytes != data)
 	{
 		std::cout << "Buffer parser failed: " << std::endl;
@@ -173,7 +173,7 @@ bool testParserMessage()
 
 	const auto data = parser.getData();
 
-	bytes.erase(bytes.begin());
+	bytes.erase(bytes.begin(), bytes.begin() + 5);
 	if (bytes != data)
 	{
 		std::cout << "Message parser failed: " << std::endl;
