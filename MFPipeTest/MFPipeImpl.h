@@ -230,7 +230,12 @@ public:
 
 	MF_HRESULT PipeClose() override
 	{
-		return MF_HRESULT::NOTIMPL;
+		if (reader)
+			reader->stop();
+		if (writer)
+			writer->stop();
+
+		return io->close() ? MF_HRESULT::RES_OK : MF_HRESULT::RES_FALSE;
 	}
 
 private:
