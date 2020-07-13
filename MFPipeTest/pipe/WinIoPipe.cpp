@@ -29,8 +29,6 @@ bool IoPipe::create(const std::string &_pipeId)
 				1000,
 				NULL);
 
-	std::cout << GetLastError() << std::endl;
-
 	if (fd == INVALID_HANDLE_VALUE)
 		return false;
 

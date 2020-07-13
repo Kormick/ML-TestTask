@@ -32,7 +32,7 @@ public:
 			/*[in]*/ const std::string &strPipeID,
 			/*[in]*/ int _nMaxBuffers,
 			/*[in]*/ const std::string &strHints,
-			/*[in]*/ int _nMaxWaitMs = 1000) override;
+			/*[in]*/ int _nMaxWaitMs = 10000) override;
 
 	MF_HRESULT PipePut(
 			/*[in]*/ const std::string &strChannel,

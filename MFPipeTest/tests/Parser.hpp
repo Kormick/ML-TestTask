@@ -37,7 +37,7 @@ bool testParserFrame()
 	auto bytes = frame.serialize();
 
 	PipeParser parser;
-	auto size = parser.parse(bytes, 0);
+	auto size = parser.parse(bytes.data(), bytes.size());
 
 	if (size != bytes.size())
 	{
@@ -55,7 +55,7 @@ bool testParserFrame()
 
 	const auto data = parser.getData();
 
-	bytes.erase(bytes.begin(), bytes.begin() + 5);
+	bytes.erase(bytes.begin(), bytes.begin() + 5); // Remove DATA_SYNC and data type from serialized data.
 	if (bytes != data)
 	{
 		std::cout << "Frame parser failed: " << std::endl;
@@ -98,7 +98,7 @@ bool testParserBuffer()
 	auto bytes = buffer.serialize();
 
 	PipeParser parser;
-	auto size = parser.parse(bytes, 0);
+	auto size = parser.parse(bytes.data(), bytes.size());
 
 	if (size != bytes.size())
 	{
@@ -116,7 +116,7 @@ bool testParserBuffer()
 
 	const auto data = parser.getData();
 
-	bytes.erase(bytes.begin(), bytes.begin() + 5);
+	bytes.erase(bytes.begin(), bytes.begin() + 5); // Remove DATA_SYNC and data type from serialized data.
 	if (bytes != data)
 	{
 		std::cout << "Buffer parser failed: " << std::endl;
@@ -155,7 +155,7 @@ bool testParserMessage()
 	auto bytes = message.serialize();
 
 	PipeParser parser;
-	auto size = parser.parse(bytes, 0);
+	auto size = parser.parse(bytes.data(), bytes.size());
 
 	if (size != bytes.size())
 	{
@@ -173,7 +173,7 @@ bool testParserMessage()
 
 	const auto data = parser.getData();
 
-	bytes.erase(bytes.begin(), bytes.begin() + 5);
+	bytes.erase(bytes.begin(), bytes.begin() + 5); // Remove DATA_SYNC and data type from serialized data.
 	if (bytes != data)
 	{
 		std::cout << "Message parser failed: " << std::endl;
@@ -208,11 +208,29 @@ bool testParserMessage()
 
 bool testParser()
 {
+	auto bool_to_str = [](bool res) {
+		return res ? "OK" : "FAILED";
+	};
+
 	bool res = true;
 
-	res = res && testParserFrame();
-	res = res && testParserBuffer();
-	res = res && testParserMessage();
+	{
+		bool inRes = testParserFrame();
+		std::cout << "\ttestParserFrame(): " << bool_to_str(inRes) << std::endl;
+		res = res && inRes;
+	}
+
+	{
+		bool inRes = testParserBuffer();
+		std::cout << "\ttestParserBuffer(): " << bool_to_str(inRes) << std::endl;
+		res = res && inRes;
+	}
+
+	{
+		bool inRes = testParserMessage();
+		std::cout << "\ttestParserMessage(): " << bool_to_str(inRes) << std::endl;
+		res = res && inRes;
+	}
 
 	return res;
 }

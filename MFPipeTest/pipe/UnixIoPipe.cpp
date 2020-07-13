@@ -7,7 +7,6 @@
 #include <string.h>
 #include "sys/stat.h"
 #include "unistd.h"
-#include "poll.h"
 
 IoPipe::IoPipe()
 	: fd(-1)
@@ -38,6 +37,8 @@ bool IoPipe::open(const std::string &pipeId, Mode mode, int32_t timeoutMs /* = 1
 		return false;
 
 	const auto start = std::chrono::steady_clock::now();
+	const auto end = start + std::chrono::milliseconds(timeoutMs);
+
 	do
 	{
 		if (mode == Mode::READ)
@@ -49,7 +50,7 @@ bool IoPipe::open(const std::string &pipeId, Mode mode, int32_t timeoutMs /* = 1
 			return true;
 
 		std::this_thread::yield();
-	} while (std::chrono::steady_clock::now() < start + std::chrono::milliseconds(timeoutMs));
+	} while (std::chrono::steady_clock::now() < end);
 
 	return false;
 }

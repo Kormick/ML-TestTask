@@ -1,14 +1,14 @@
 #ifndef MF_TYPES_H_
 #define MF_TYPES_H_
 
+#include <cmath>
 #include <cstdint>
+#include <deque>
+#include <iostream>
+#include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
-#include <memory>
-#include <iostream>
-#include <cmath>
-#include <mutex>
-#include <deque>
 
 typedef long long int REFERENCE_TIME;
 
@@ -37,17 +37,6 @@ typedef struct M_TIME
 	REFERENCE_TIME rtEndTime;
 } 	M_TIME;
 
-inline bool operator==(const M_TIME &lh, const M_TIME &rh)
-{
-	return lh.rtStartTime == rh.rtStartTime
-			&& lh.rtEndTime == rh.rtEndTime;
-}
-
-inline bool operator!=(const M_TIME &lh, const M_TIME &rh)
-{
-	return !(lh == rh);
-}
-
 typedef enum eMFCC
 {
 	eMFCC_Default = 0,
@@ -72,22 +61,6 @@ typedef struct M_VID_PROPS
 	double dblRate;
 } 	M_VID_PROPS;
 
-inline bool operator==(const M_VID_PROPS &lh, const M_VID_PROPS &rh)
-{
-	return lh.fccType == rh.fccType
-			&& lh.nWidth == rh.nWidth
-			&& lh.nHeight == rh.nHeight
-			&& lh.nRowBytes == rh.nRowBytes
-			&& lh.nAspectX == rh.nAspectX
-			&& lh.nAspectY == rh.nAspectY
-			&& fabs(lh.dblRate - rh.dblRate) < 0.0001;
-}
-
-inline bool operator!=(const M_VID_PROPS &lh, const M_VID_PROPS &rh)
-{
-	return !(lh == rh);
-}
-
 typedef struct M_AUD_PROPS
 {
 	int nChannels;
@@ -96,35 +69,11 @@ typedef struct M_AUD_PROPS
 	int nTrackSplitBits;
 } 	M_AUD_PROPS;
 
-inline bool operator==(const M_AUD_PROPS &lh, const M_AUD_PROPS &rh)
-{
-	return lh.nChannels == rh.nChannels
-			&& lh.nSamplesPerSec == rh.nSamplesPerSec
-			&& lh.nBitsPerSample == rh.nBitsPerSample
-			&& lh.nTrackSplitBits == rh.nTrackSplitBits;
-}
-
-inline bool operator!=(const M_AUD_PROPS &lh, const M_AUD_PROPS &rh)
-{
-	return !(lh == rh);
-}
-
 typedef struct M_AV_PROPS
 {
 	M_VID_PROPS vidProps;
 	M_AUD_PROPS audProps;
 } 	M_AV_PROPS;
-
-inline bool operator==(const M_AV_PROPS &lh, const M_AV_PROPS &rh)
-{
-	return lh.vidProps == rh.vidProps
-			&& lh.audProps == rh.audProps;
-}
-
-inline bool operator!=(const M_AV_PROPS &lh, const M_AV_PROPS &rh)
-{
-	return !(lh == rh);
-}
 
 typedef struct MF_BASE_TYPE
 {
@@ -201,20 +150,6 @@ typedef struct MF_FRAME: public MF_BASE_TYPE
 	}
 } MF_FRAME;
 
-inline bool operator==(const MF_FRAME &lh, const MF_FRAME &rh)
-{
-	return lh.time == rh.time
-			&& lh.av_props == rh.av_props
-			&& lh.str_user_props == rh.str_user_props
-			&& lh.vec_video_data == rh.vec_video_data
-			&& lh.vec_audio_data == rh.vec_audio_data;
-}
-
-inline bool operator!=(const MF_FRAME &lh, const MF_FRAME &rh)
-{
-	return !(lh == rh);
-}
-
 typedef enum eMFBufferFlags
 {
 	eMFBF_Empty = 0,
@@ -270,17 +205,6 @@ typedef struct MF_BUFFER: public MF_BASE_TYPE
 		return buffer;
 	}
 } MF_BUFFER;
-
-inline bool operator==(const MF_BUFFER &lh, const MF_BUFFER &rh)
-{
-	return lh.flags == rh.flags
-			&& lh.data == rh.data;
-}
-
-inline bool operator!=(const MF_BUFFER &lh, const MF_BUFFER &rh)
-{
-	return !(lh == rh);
-}
 
 struct Message
 {
@@ -341,4 +265,79 @@ struct MessageBuffer
 	std::deque<Message> data;
 };
 
+inline bool operator==(const M_VID_PROPS &lh, const M_VID_PROPS &rh)
+{
+	return lh.fccType == rh.fccType
+	        && lh.nWidth == rh.nWidth
+	        && lh.nHeight == rh.nHeight
+	        && lh.nRowBytes == rh.nRowBytes
+	        && lh.nAspectX == rh.nAspectX
+	        && lh.nAspectY == rh.nAspectY
+	        && fabs(lh.dblRate - rh.dblRate) < 0.0001;
+}
+
+inline bool operator!=(const M_VID_PROPS &lh, const M_VID_PROPS &rh)
+{
+	return !(lh == rh);
+}
+
+inline bool operator==(const M_TIME &lh, const M_TIME &rh)
+{
+	return lh.rtStartTime == rh.rtStartTime
+	        && lh.rtEndTime == rh.rtEndTime;
+}
+
+inline bool operator!=(const M_TIME &lh, const M_TIME &rh)
+{
+	return !(lh == rh);
+}
+
+inline bool operator==(const M_AUD_PROPS &lh, const M_AUD_PROPS &rh)
+{
+	return lh.nChannels == rh.nChannels
+	        && lh.nSamplesPerSec == rh.nSamplesPerSec
+	        && lh.nBitsPerSample == rh.nBitsPerSample
+	        && lh.nTrackSplitBits == rh.nTrackSplitBits;
+}
+
+inline bool operator!=(const M_AUD_PROPS &lh, const M_AUD_PROPS &rh)
+{
+	return !(lh == rh);
+}
+
+inline bool operator==(const M_AV_PROPS &lh, const M_AV_PROPS &rh)
+{
+	return lh.vidProps == rh.vidProps
+	        && lh.audProps == rh.audProps;
+}
+
+inline bool operator!=(const M_AV_PROPS &lh, const M_AV_PROPS &rh)
+{
+	return !(lh == rh);
+}
+
+inline bool operator==(const MF_FRAME &lh, const MF_FRAME &rh)
+{
+	return lh.time == rh.time
+	        && lh.av_props == rh.av_props
+	        && lh.str_user_props == rh.str_user_props
+	        && lh.vec_video_data == rh.vec_video_data
+	        && lh.vec_audio_data == rh.vec_audio_data;
+}
+
+inline bool operator!=(const MF_FRAME &lh, const MF_FRAME &rh)
+{
+	return !(lh == rh);
+}
+
+inline bool operator==(const MF_BUFFER &lh, const MF_BUFFER &rh)
+{
+	return lh.flags == rh.flags
+	        && lh.data == rh.data;
+}
+
+inline bool operator!=(const MF_BUFFER &lh, const MF_BUFFER &rh)
+{
+	return !(lh == rh);
+}
 #endif

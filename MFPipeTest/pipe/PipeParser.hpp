@@ -41,8 +41,6 @@ public:
 	void reset();
 	const std::vector<uint8_t> getData() const;
 	State getState() const;
-	size_t parse(const std::vector<uint8_t> &rawData, size_t startPos);
-
 	size_t parse(const uint8_t *rawData, size_t size);
 
 private:

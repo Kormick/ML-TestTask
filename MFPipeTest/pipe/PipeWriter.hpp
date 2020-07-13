@@ -20,8 +20,7 @@ public:
 
 	void start();
 	void stop();
-	void run(const std::string &pipeId,
-			 std::shared_ptr<DataBuffer> dataBuffer);
+	void run(std::shared_ptr<DataBuffer> dataBuffer);
 
 private:
 	volatile bool isRunning;
@@ -30,8 +29,6 @@ private:
 
 	std::shared_ptr<IoInterface> io;
 	std::shared_ptr<DataBuffer> dataBuffer;
-//	std::shared_ptr<std::deque<Message>> messageBuffer;
-
 	std::unique_ptr<std::thread> thread;
 };
 

@@ -24,7 +24,7 @@ PipeReader::~PipeReader()
 void PipeReader::start()
 {
 	isRunning = true;
-	thread.reset(new std::thread(&PipeReader::run, this, std::cref(pipeId), dataBuffer));
+	thread.reset(new std::thread(&PipeReader::run, this, dataBuffer));
 }
 
 void PipeReader::stop()
@@ -34,10 +34,8 @@ void PipeReader::stop()
 		thread->join();
 }
 
-void PipeReader::run(const std::string &pipeId, std::shared_ptr<DataBuffer> dataBuffer)
+void PipeReader::run(std::shared_ptr<DataBuffer> dataBuffer)
 {
-	std::cout << "READER started" << std::endl;
-
 	uint8_t buffer[512 * 1024] = { 0 };
 	size_t parsedBytes = 0;
 	ssize_t readBytes = 0;
@@ -54,8 +52,7 @@ void PipeReader::run(const std::string &pipeId, std::shared_ptr<DataBuffer> data
 			continue;
 		}
 
-		bool doRead = true;
-		while (doRead)
+		while (true)
 		{
 			if (readBytes <= 0)
 				readBytes = io->read(buffer, 512 * 1024);
@@ -71,8 +68,8 @@ void PipeReader::run(const std::string &pipeId, std::shared_ptr<DataBuffer> data
 				{
 					const auto data = parser.getData();
 
-					MF_BUFFER buffer;
-					dataBuffer->data.push_back(std::shared_ptr<MF_BASE_TYPE>(buffer.deserialize(data)));
+					MF_BUFFER buf;
+					dataBuffer->data.push_back(std::shared_ptr<MF_BASE_TYPE>(buf.deserialize(data)));
 					parser.reset();
 					break;
 				}

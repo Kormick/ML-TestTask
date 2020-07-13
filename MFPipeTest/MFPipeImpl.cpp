@@ -36,11 +36,7 @@ MF_HRESULT MFPipeImpl::PipeCreate(
 	else
 		io = std::make_shared<IoPipe>();
 
-	if (io->create(strPipeID))
-	{
-		std::cout << "Pipe " << strPipeID << " created successfully." << std::endl;
-	}
-	else
+	if (!io->create(strPipeID))
 	{
 		std::cerr << "Failed to create pipe. ERRNO: " << errno << std::endl;
 		return MF_HRESULT::RES_FALSE;
@@ -76,7 +72,7 @@ MF_HRESULT MFPipeImpl::PipeOpen(
 
 		if (!io->open(pipeId, IoInterface::Mode::READ, _nMaxWaitMs))
 		{
-			std::cout << "Failed to open pipe on read." << std::endl;
+			std::cerr << "Failed to open pipe on read." << std::endl;
 			return MF_HRESULT::RES_FALSE;
 		}
 
@@ -127,7 +123,7 @@ MF_HRESULT MFPipeImpl::PipePut(
 		return MF_HRESULT::RES_OK;
 	} while (std::chrono::steady_clock::now() < end);
 
-	std::cout << "Timeout on adding buffer to write queue" << std::endl;
+	std::cerr << "Timeout on adding buffer to write queue" << std::endl;
 	return MF_HRESULT::RES_FALSE;
 }
 
@@ -158,7 +154,7 @@ MF_HRESULT MFPipeImpl::PipeGet(
 		return MF_HRESULT::RES_OK;
 	} while (std::chrono::steady_clock::now() < end);
 
-	std::cout << "Timeout on getting buffer from read queue" << std::endl;
+	std::cerr << "Timeout on getting buffer from read queue" << std::endl;
 	return MF_HRESULT::RES_FALSE;
 }
 
@@ -198,7 +194,7 @@ MF_HRESULT MFPipeImpl::PipeMessagePut(
 		return MF_HRESULT::RES_OK;
 	} while (std::chrono::steady_clock::now() < end);
 
-	std::cout << "Timeout on adding message to write queue" << std::endl;
+	std::cerr << "Timeout on adding message to write queue" << std::endl;
 	return MF_HRESULT::RES_FALSE;
 }
 
@@ -231,7 +227,7 @@ MF_HRESULT MFPipeImpl::PipeMessageGet(
 		return MF_HRESULT::RES_OK;
 	} while (std::chrono::steady_clock::now() < end);
 
-	std::cout << "Timeout on getting message from read queue" << std::endl;
+	std::cerr << "Timeout on getting message from read queue" << std::endl;
 	return MF_HRESULT::RES_FALSE;
 }
 

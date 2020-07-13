@@ -10,7 +10,7 @@ PipeWriter::PipeWriter(std::shared_ptr<IoInterface> io,
 	  pipeId(pipeId),
 	  fd(-1),
 	  io(io),
-      dataBuffer(dataBuffer)
+	  dataBuffer(dataBuffer)
 {}
 
 PipeWriter::~PipeWriter()
@@ -22,7 +22,7 @@ PipeWriter::~PipeWriter()
 void PipeWriter::start()
 {
 	isRunning = true;
-	thread.reset(new std::thread(&PipeWriter::run, this, std::cref(pipeId), dataBuffer));
+	thread.reset(new std::thread(&PipeWriter::run, this, dataBuffer));
 }
 
 void PipeWriter::stop()
@@ -42,20 +42,20 @@ void PipeWriter::stop()
 		thread->join();
 }
 
-void PipeWriter::run(const std::string &pipeId,
-                     std::shared_ptr<DataBuffer> dataBuffer)
+void PipeWriter::run(std::shared_ptr<DataBuffer> dataBuffer)
 {
-	std::cout << "WRITER started" << std::endl;
-
 	while (isRunning)
 	{
-		if (!dataBuffer->mutex.try_lock_for(std::chrono::milliseconds(10)))
+		if (!dataBuffer->mutex.try_lock())
+		{
+			std::this_thread::yield();
 			continue;
+		}
 
 		if (dataBuffer->data.empty() && dataBuffer->messages.empty())
 		{
 			dataBuffer->mutex.unlock();
-			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			std::this_thread::yield();
 			continue;
 		}
 

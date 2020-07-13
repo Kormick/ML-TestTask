@@ -1,6 +1,8 @@
 #include "UnixIoUdp.hpp"
 
+#include <chrono>
 #include <iostream>
+#include <thread>
 #include "memory.h"
 #include "unistd.h"
 
@@ -50,13 +52,13 @@ bool IoUdp::create(const std::string &id)
 	res = setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &bufSize, sizeof(bufSize));
 	if (res != 0)
 	{
-		std::cout << "Failed to set SO_SNDBUF" << std::endl;
+		std::cerr << "Failed to set SO_SNDBUF" << std::endl;
 		return false;
 	}
 	res = setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &bufSize, sizeof(bufSize));
 	if (res != 0)
 	{
-		std::cout << "Failed to set SO_RCVBUF" << std::endl;
+		std::cerr << "Failed to set SO_RCVBUF" << std::endl;
 		return false;
 	}
 
@@ -65,22 +67,28 @@ bool IoUdp::create(const std::string &id)
 
 bool IoUdp::open(const std::string &id, Mode mode, int32_t timeoutMs)
 {
-	if (mode == Mode::WRITE)
+	if (mode == Mode::READ)
 	{
-		return true;
-	}
-	else if (mode == Mode::READ)
-	{
-		if (!create(id))
+		if (id.empty())
 			return false;
 
-		if (bind(fd, addrinfo->ai_addr, addrinfo->ai_addrlen) != 0)
+		const auto start = std::chrono::steady_clock::now();
+		const auto end = start + std::chrono::milliseconds(timeoutMs);
+
+		do
 		{
-			freeaddrinfo(addrinfo);
-			::close(fd);
-			return false;
-		}
-
+			if (create(id))
+			{
+				if (bind(fd, addrinfo->ai_addr, addrinfo->ai_addrlen) == 0)
+					return true;
+				freeaddrinfo(addrinfo);
+				::close(fd);
+			}
+			std::this_thread::yield();
+		} while (std::chrono::steady_clock::now() < end);
+	}
+	else if (mode == Mode::WRITE)
+	{
 		return true;
 	}
 
@@ -107,16 +115,10 @@ ssize_t IoUdp::write(const uint8_t *buf, size_t size)
 	size_t bufSize = 32 * 1024;
 	size = size > static_cast<size_t>(bufSize) ? bufSize : size;
 
-	auto res = sendto(fd, buf, size, MSG_CONFIRM, addrinfo->ai_addr, addrinfo->ai_addrlen);
-	if (res == -1)
-		std::cout << "UDP write: " << strerror(errno) << std::endl;
-	return res;
+	return sendto(fd, buf, size, MSG_CONFIRM, addrinfo->ai_addr, addrinfo->ai_addrlen);
 }
 
 ssize_t IoUdp::read(uint8_t *buf, size_t size)
 {
-	auto res = recvfrom(fd, buf, size, MSG_DONTWAIT, nullptr, nullptr);
-//	if (res == -1)
-//		std::cout << "UDP read: " << strerror(errno) << std::endl;
-	return res;
+	return recvfrom(fd, buf, size, MSG_DONTWAIT, nullptr, nullptr);
 }

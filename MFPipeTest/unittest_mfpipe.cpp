@@ -15,9 +15,17 @@ int main(int argc, char *argv[])
 	bool readProcess = argExists(argv, argv + argc, "read");
 	bool writeProcess = argExists(argv, argv + argc, "write");
 	bool multithreaded = argExists(argv, argv + argc, "multi");
-	bool profilerRead = argExists(argv, argv + argc, "profilerR");
-	bool profilerWrite = argExists(argv, argv + argc, "profilerW");
 	bool udp = argExists(argv, argv + argc, "udp");
+	bool pipe = argExists(argv, argv + argc, "pipe");
+	bool all = argExists(argv, argv + argc, "all");
+
+	if (all)
+	{
+		parser = true;
+		multithreaded = true;
+		pipe = true;
+		udp = true;
+	}
 
 	auto bool_to_str = [](bool res) {
 		return res ? "OK" : "FAILED";
@@ -25,21 +33,24 @@ int main(int argc, char *argv[])
 
 	if (parser)
 	{
+		std::cout << "testParser(): " << std::endl;
 		bool res = testParser();
-		std::cout << "Parser: " << bool_to_str(res) << std::endl;
+		std::cout << "testParser(): " << bool_to_str(res) << std::endl;
 	}
 
 	if (readProcess)
 	{
 		if (udp)
 		{
+			std::cout << "testUdp() READ: " << std::endl;
 			bool res = testUdp(true);
-			std::cout << "PipeUdp READ: " << bool_to_str(res) << std::endl;
+			std::cout << "testUdp() READ: " << bool_to_str(res) << std::endl;
 		}
-		else
+		if (pipe)
 		{
+			std::cout << "testPipe() READ: " << std::endl;
 			bool res = testPipeProcess(true);
-			std::cout << "PipeProcess READ: " << bool_to_str(res) << std::endl;
+			std::cout << "testPipe() READ: " << bool_to_str(res) << std::endl;
 		}
 	}
 
@@ -47,13 +58,15 @@ int main(int argc, char *argv[])
 	{
 		if (udp)
 		{
+			std::cout << "testUdp() WRITE: " << std::endl;
 			bool res = testUdp(false);
-			std::cout << "PipeUdp WRITE: " << bool_to_str(res) << std::endl;
+			std::cout << "testUdp() WRITE: " << bool_to_str(res) << std::endl;
 		}
-		else
+		if (pipe)
 		{
+			std::cout << "testPipe() WRITE: " << std::endl;
 			bool res = testPipeProcess(false);
-			std::cout << "PipeProcess WRITE: " << bool_to_str(res) << std::endl;
+			std::cout << "testPipe() WRITE: " << bool_to_str(res) << std::endl;
 		}
 	}
 
@@ -61,26 +74,16 @@ int main(int argc, char *argv[])
 	{
 		if (udp)
 		{
+			std::cout << "testUdpMultithreaded(): " << std::endl;
 			bool res = testUdpMultithreaded();
-			std::cout << "UdpMultithreaded: " << bool_to_str(res) << std::endl;
+			std::cout << "testUdpMultithreaded(): " << bool_to_str(res) << std::endl;
 		}
-		else
+		if (pipe)
 		{
+			std::cout << "testPipeMultithreaded(): " << std::endl;
 			bool res = testPipeMultithreaded();
-			std::cout << "PipeMultithreaded: " << bool_to_str(res) << std::endl;
+			std::cout << "testPipeMultithreaded(): " << bool_to_str(res) << std::endl;
 		}
-	}
-
-	if (profilerRead)
-	{
-		bool res = testPipePerformance(true);
-		std::cout << "PipeProfiler READ: " << bool_to_str(res) << std::endl;
-	}
-
-	if (profilerWrite)
-	{
-		bool res = testPipePerformance(false);
-		std::cout << "PipeProfiler WRITE: " << bool_to_str(res) << std::endl;
 	}
 
 	return 0;
