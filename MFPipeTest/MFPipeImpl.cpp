@@ -165,7 +165,27 @@ MF_HRESULT MFPipeImpl::PipePeek(
 		/*[in]*/ int _nMaxWaitMs,
 		/*[in]*/ const std::string &strHints)
 {
-	return MF_HRESULT::NOTIMPL;
+	auto start = std::chrono::steady_clock::now();
+	auto end = start + std::chrono::milliseconds(_nMaxWaitMs);
+
+	do
+	{
+		if (!readDataBuffer->mutex.try_lock_until(end))
+			break;
+
+		if (readDataBuffer->data.size() <= static_cast<size_t>(_nIndex))
+		{
+			readDataBuffer->mutex.unlock();
+			std::this_thread::yield();
+			continue;
+		}
+
+		pBufferOrFrame = readDataBuffer->data.at(_nIndex);
+		readDataBuffer->mutex.unlock();
+		return MF_HRESULT::RES_OK;
+	} while (std::chrono::steady_clock::now() < end);
+
+	return MF_HRESULT::RES_FALSE;
 }
 
 MF_HRESULT MFPipeImpl::PipeMessagePut(
