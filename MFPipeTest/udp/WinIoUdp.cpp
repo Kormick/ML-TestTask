@@ -4,6 +4,8 @@
 #include <iostream>
 #include <thread>
 
+static constexpr size_t MAX_MES_SIZE = 65507; // Max UDP message size.
+
 IoUdp::IoUdp()
 	: fd(INVALID_SOCKET)
 {}
@@ -40,6 +42,20 @@ bool IoUdp::create(const std::string &id)
 	fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (fd == INVALID_SOCKET)
 		return false;
+
+	int32_t bufSize = 10 * 1024 * 1024;
+	res = setsockopt(fd, SOL_SOCKET, SO_SNDBUF, reinterpret_cast<const char *>(&bufSize), sizeof(bufSize));
+	if (res != 0)
+	{
+		std::cerr << "Failed to set SO_SNDBUF" << std::endl;
+		return false;
+	}
+	res = setsockopt(fd, SOL_SOCKET, SO_RCVBUF, reinterpret_cast<const char *>(&bufSize), sizeof(bufSize));
+	if (res != 0)
+	{
+		std::cerr << "Failed to set SO_RCVBUF" << std::endl;
+		return false;
+	}
 
 	return true;
 }
@@ -91,12 +107,9 @@ bool IoUdp::close()
 
 ssize_t IoUdp::write(const uint8_t *buf, size_t size)
 {
-	size_t bufSize = 32 * 1024;
-	size = size > bufSize ? bufSize : size;
+	size = size > MAX_MES_SIZE ? MAX_MES_SIZE : size;
 
-	auto res = sendto(fd, reinterpret_cast<const char *>(buf), size,
-					  0, reinterpret_cast<SOCKADDR *>(&addr), sizeof(addr));
-	return res;
+	return sendto(fd, reinterpret_cast<const char *>(buf), size, 0, reinterpret_cast<SOCKADDR *>(&addr), sizeof(addr));
 }
 
 ssize_t IoUdp::read(uint8_t *buf, size_t size)

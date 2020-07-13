@@ -6,6 +6,8 @@
 #include "memory.h"
 #include "unistd.h"
 
+static constexpr size_t MAX_MES_SIZE = 65507; // Max UDP message size.
+
 IoUdp::IoUdp()
 	: fd(-1),
 	  addrinfo(nullptr)
@@ -48,7 +50,7 @@ bool IoUdp::create(const std::string &id)
 		return false;
 	}
 
-	int32_t bufSize = 512 * 1024;
+	int32_t bufSize = 10 * 1024 * 1024;
 	res = setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &bufSize, sizeof(bufSize));
 	if (res != 0)
 	{
@@ -112,8 +114,7 @@ bool IoUdp::close()
 
 ssize_t IoUdp::write(const uint8_t *buf, size_t size)
 {
-	size_t bufSize = 32 * 1024;
-	size = size > static_cast<size_t>(bufSize) ? bufSize : size;
+	size = size > MAX_MES_SIZE ? MAX_MES_SIZE : size;
 
 	return sendto(fd, buf, size, MSG_CONFIRM, addrinfo->ai_addr, addrinfo->ai_addrlen);
 }
