@@ -93,22 +93,28 @@ bool testBuffer(const std::string &pipeName, bool read)
 
 			if (res != MF_HRESULT::RES_OK)
 			{
-				std::cerr << "Pipe read failed: " << res << std::endl;
+				std::cerr << "Read " << i << " failed: " << res << std::endl;
 				return false;
 			}
 
 			if (buf == nullptr)
 			{
-				std::cerr << "Read data is nullptr" << std::endl;
+				std::cerr << "Read " << i << " failed: data is nullptr" << std::endl;
+				return false;
+			}
+
+			const auto bp = dynamic_cast<MF_BUFFER *>(buf.get());
+			if (bp == nullptr)
+			{
+				std::cerr << "Read " << i << " failed: invalid data type" << std::endl;
 				return false;
 			}
 
 			const auto dp = dynamic_cast<MF_BUFFER *>(arrBuffersIn[i].get());
-			const auto bp = dynamic_cast<MF_BUFFER *>(buf.get());
 
 			if (*dp != *bp)
 			{
-				std::cerr << "Read invalid data" << std::endl;
+				std::cerr << "Read " << i << " failed: invalid data" << std::endl;
 				return false;
 			}
 		}
@@ -187,7 +193,7 @@ bool testFrame(const std::string &pipeName, bool read)
 			res = writePipe.PipePut("", arrBuffersIn[i], 1000, "");
 			if (res != MF_HRESULT::RES_OK)
 			{
-				std::cerr << "Failed to write into pipe" << std::endl;
+				std::cerr << "Write " << i << " failed: " << res << std::endl;
 				return false;
 			}
 		}
@@ -219,22 +225,28 @@ bool testFrame(const std::string &pipeName, bool read)
 
 			if (res != MF_HRESULT::RES_OK)
 			{
-				std::cerr << "Pipe read failed: " << res << std::endl;
+				std::cerr << "Read " << i << " failed: " << res << std::endl;
 				return false;
 			}
 
 			if (buf == nullptr)
 			{
-				std::cerr << "Read data is nullptr" << std::endl;
+				std::cerr << "Read " << i << " failed: data is nullptr" << std::endl;
+				return false;
+			}
+
+			const auto bp = dynamic_cast<MF_FRAME *>(buf.get());
+			if (bp == nullptr)
+			{
+				std::cerr << "Read " << i << " failed: invalid data type" << std::endl;
 				return false;
 			}
 
 			const auto dp = dynamic_cast<MF_FRAME *>(arrBuffersIn[i].get());
-			const auto bp = dynamic_cast<MF_FRAME *>(buf.get());
 
 			if (*dp != *bp)
 			{
-				std::cerr << "Read invalid data" << std::endl;
+				std::cerr << "Read " << i << " failed: invalid data" << std::endl;
 				return false;
 			}
 		}
