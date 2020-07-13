@@ -13,7 +13,6 @@ class PipeWriter
 {
 public:
 	PipeWriter(std::shared_ptr<IoInterface> io,
-			   const std::string &pipeId,
 			   std::shared_ptr<DataBuffer> dataBuffer);
 
 	~PipeWriter();
@@ -24,9 +23,6 @@ public:
 
 private:
 	volatile bool isRunning;
-	std::string pipeId;
-	int32_t fd;
-
 	std::shared_ptr<IoInterface> io;
 	std::shared_ptr<DataBuffer> dataBuffer;
 	std::unique_ptr<std::thread> thread;

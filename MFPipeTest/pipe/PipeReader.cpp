@@ -4,12 +4,9 @@
 #include "unistd.h"
 
 PipeReader::PipeReader(std::shared_ptr<IoInterface> io,
-					   const std::string &pipeId,
 					   size_t maxBuffers,
 					   std::shared_ptr<DataBuffer> dataBuffer)
 	: isRunning(false),
-	  pipeId(pipeId),
-	  fd(-1),
 	  maxBuffers(maxBuffers),
 	  io(io),
 	  dataBuffer(dataBuffer)
@@ -66,28 +63,31 @@ void PipeReader::run(std::shared_ptr<DataBuffer> dataBuffer)
 			{
 				case PipeParser::State::BUFFER_READY:
 				{
+					const auto ch = parser.getChannel();
 					const auto data = parser.getData();
 
 					MF_BUFFER buf;
-					dataBuffer->data.push_back(std::shared_ptr<MF_BASE_TYPE>(buf.deserialize(data)));
+					dataBuffer->data.push_back({ ch, std::shared_ptr<MF_BASE_TYPE>(buf.deserialize(data)) });
 					parser.reset();
 					break;
 				}
 				case PipeParser::State::FRAME_READY:
 				{
+					const auto ch = parser.getChannel();
 					const auto data = parser.getData();
 
 					MF_FRAME frame;
-					dataBuffer->data.push_back(std::shared_ptr<MF_BASE_TYPE>(frame.deserialize(data)));
+					dataBuffer->data.push_back({ ch, std::shared_ptr<MF_BASE_TYPE>(frame.deserialize(data)) });
 					parser.reset();
 					break;
 				}
 				case PipeParser::State::MESSAGE_READY:
 				{
+					const auto ch = parser.getChannel();
 					const auto data = parser.getData();
 
 					Message message;
-					dataBuffer->messages.push_back(message.deserialize(data));
+					dataBuffer->messages.push_back({ ch, std::make_shared<Message>(message.deserialize(data)) });
 					parser.reset();
 					break;
 				}

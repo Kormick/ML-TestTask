@@ -10,6 +10,8 @@ public:
 	{
 		IDLE = 0x00,
 		SYNC,
+		CHANNEL_SIZE,
+		CHANNEL,
 		DATA_TYPE,
 
 		FRAME_TIME,
@@ -39,7 +41,8 @@ public:
 	PipeParser();
 
 	void reset();
-	const std::vector<uint8_t> getData() const;
+	std::vector<uint8_t> getData() const;
+	std::string getChannel() const;
 	State getState() const;
 	size_t parse(const uint8_t *rawData, size_t size);
 
@@ -49,6 +52,9 @@ private:
 	uint8_t syncBytes[4];
 	uint8_t syncCount;
 	size_t chunkSize;
+	std::string channel;
+	std::vector<uint8_t> channelSize;
 	std::vector<uint8_t> data;
 };
+
 #endif // PIPEPARSER_HPP

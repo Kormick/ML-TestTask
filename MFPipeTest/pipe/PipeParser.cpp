@@ -15,12 +15,19 @@ void PipeParser::reset()
 	type = DataType::NONE;
 	syncCount = 0;
 	chunkSize = 0;
+	channel.clear();
+	channelSize.clear();
 	data.clear();
 }
 
-const std::vector<uint8_t> PipeParser::getData() const
+std::vector<uint8_t> PipeParser::getData() const
 {
 	return data;
+}
+
+std::string PipeParser::getChannel() const
+{
+	return channel;
 }
 
 PipeParser::State PipeParser::getState() const
@@ -46,8 +53,32 @@ size_t PipeParser::parse(const uint8_t *rawData, size_t size)
 					syncCount = 0;
 
 				if (syncCount == 4)
-					state = State::DATA_TYPE;
+				{
+					state = State::CHANNEL_SIZE;
+					chunkSize = sizeof(size_t);
+				}
 
+				break;
+			}
+
+			case State::CHANNEL_SIZE:
+			{
+				channelSize.push_back(byte);
+				chunkSize--;
+				if (chunkSize == 0)
+				{
+					chunkSize = *reinterpret_cast<const size_t *>(channelSize.data());
+					state = chunkSize == 0 ? State::DATA_TYPE : State::CHANNEL;
+				}
+				break;
+			}
+
+			case State::CHANNEL:
+			{
+				channel.push_back(byte);
+				chunkSize--;
+				if (chunkSize == 0)
+					state = State::DATA_TYPE;
 				break;
 			}
 

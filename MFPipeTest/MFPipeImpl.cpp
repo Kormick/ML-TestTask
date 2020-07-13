@@ -77,7 +77,7 @@ MF_HRESULT MFPipeImpl::PipeOpen(
 		}
 
 		readDataBuffer = std::make_shared<DataBuffer>();
-		reader = std::make_unique<PipeReader>(io, pipeId, _nMaxBuffers, readDataBuffer);
+		reader = std::make_unique<PipeReader>(io, _nMaxBuffers, readDataBuffer);
 		reader->start();
 	}
 	if (strHints.find("W") != std::string::npos)
@@ -90,7 +90,7 @@ MF_HRESULT MFPipeImpl::PipeOpen(
 
 		maxBuffers = _nMaxBuffers;
 		writeDataBuffer = std::make_shared<DataBuffer>();
-		writer = std::make_unique<PipeWriter>(io, pipeId, writeDataBuffer);
+		writer = std::make_unique<PipeWriter>(io, writeDataBuffer);
 		writer->start();
 	}
 
@@ -118,7 +118,7 @@ MF_HRESULT MFPipeImpl::PipePut(
 			continue;
 		}
 
-		writeDataBuffer->data.push_back(pBufferOrFrame);
+		writeDataBuffer->data.push_back({ strChannel, pBufferOrFrame });
 		writeDataBuffer->mutex.unlock();
 		return MF_HRESULT::RES_OK;
 	} while (std::chrono::steady_clock::now() < end);
@@ -141,15 +141,22 @@ MF_HRESULT MFPipeImpl::PipeGet(
 		if (!readDataBuffer->mutex.try_lock_until(end))
 			break;
 
-		if (readDataBuffer->data.empty())
+		auto it = readDataBuffer->data.begin();
+		for (; it != readDataBuffer->data.end(); ++it)
+		{
+			if (it->first == strChannel)
+				break;
+		}
+
+		if (it == readDataBuffer->data.end())
 		{
 			readDataBuffer->mutex.unlock();
 			std::this_thread::yield();
 			continue;
 		}
 
-		pBufferOrFrame = readDataBuffer->data.front();
-		readDataBuffer->data.pop_front();
+		pBufferOrFrame = it->second;
+		readDataBuffer->data.erase(it);
 		readDataBuffer->mutex.unlock();
 		return MF_HRESULT::RES_OK;
 	} while (std::chrono::steady_clock::now() < end);
@@ -173,14 +180,22 @@ MF_HRESULT MFPipeImpl::PipePeek(
 		if (!readDataBuffer->mutex.try_lock_until(end))
 			break;
 
-		if (readDataBuffer->data.size() <= static_cast<size_t>(_nIndex))
+		auto it = readDataBuffer->data.begin();
+		auto count = 0;
+		for (; it != readDataBuffer->data.end() && count <= _nIndex; ++it, ++count)
+		{
+			if (it->first == strChannel && count == _nIndex)
+				break;
+		}
+
+		if (it == readDataBuffer->data.end())
 		{
 			readDataBuffer->mutex.unlock();
 			std::this_thread::yield();
 			continue;
 		}
 
-		pBufferOrFrame = readDataBuffer->data.at(_nIndex);
+		pBufferOrFrame = it->second;
 		readDataBuffer->mutex.unlock();
 		return MF_HRESULT::RES_OK;
 	} while (std::chrono::steady_clock::now() < end);
@@ -209,7 +224,8 @@ MF_HRESULT MFPipeImpl::PipeMessagePut(
 			continue;
 		}
 
-		writeDataBuffer->messages.push_back({ strEventName, strEventParam });
+		Message mes = { strEventName, strEventParam };
+		writeDataBuffer->messages.push_back({ strChannel, std::make_shared<Message>(mes) });
 		writeDataBuffer->mutex.unlock();
 		return MF_HRESULT::RES_OK;
 	} while (std::chrono::steady_clock::now() < end);
@@ -232,17 +248,26 @@ MF_HRESULT MFPipeImpl::PipeMessageGet(
 		if (!readDataBuffer->mutex.try_lock_until(end))
 			break;
 
-		if (readDataBuffer->messages.empty())
+		auto it = readDataBuffer->messages.begin();
+		for (; it != readDataBuffer->messages.end(); ++it)
+		{
+			if (it->first == strChannel)
+				break;
+		}
+
+		if (it == readDataBuffer->messages.end())
 		{
 			readDataBuffer->mutex.unlock();
 			std::this_thread::yield();
 			continue;
 		}
 
-		Message mes = readDataBuffer->messages.front();
-		readDataBuffer->messages.pop_front();
-		*pStrEventName = mes.name;
-		*pStrEventParam = mes.param;
+		auto mes = it->second;
+		readDataBuffer->messages.erase(it);
+
+		*pStrEventName = mes->name;
+		*pStrEventParam = mes->param;
+
 		readDataBuffer->mutex.unlock();
 		return MF_HRESULT::RES_OK;
 	} while (std::chrono::steady_clock::now() < end);

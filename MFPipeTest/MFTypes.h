@@ -102,7 +102,6 @@ typedef struct MF_FRAME: public MF_BASE_TYPE
 			buf.insert(buf.end(), bytes, bytes + sizeof(data));
 		};
 
-		to_bytes(DATA_SYNC);
 		to_bytes(static_cast<uint8_t>(DataType::FRAME));
 		to_bytes(time);
 		to_bytes(av_props);
@@ -178,7 +177,6 @@ typedef struct MF_BUFFER: public MF_BASE_TYPE
 			buf.insert(buf.end(), bytes, bytes + sizeof(data));
 		};
 
-		to_bytes(DATA_SYNC);
 		to_bytes(static_cast<uint8_t>(DataType::BUFFER));
 		to_bytes(flags);
 
@@ -220,7 +218,6 @@ struct Message
 			buf.insert(buf.end(), bytes, bytes + sizeof(data));
 		};
 
-		to_bytes(DATA_SYNC);
 		to_bytes(static_cast<uint8_t>(DataType::MESSAGE));
 
 		to_bytes(name.size());
@@ -255,15 +252,30 @@ struct Message
 struct DataBuffer
 {
 	std::timed_mutex mutex;
-	std::deque<std::shared_ptr<MF_BASE_TYPE>> data;
-	std::deque<Message> messages;
+	std::deque<std::pair<std::string, std::shared_ptr<MF_BASE_TYPE>>> data;
+	std::deque<std::pair<std::string, std::shared_ptr<Message>>> messages;
 };
 
-struct MessageBuffer
+template <typename T>
+static std::vector<uint8_t> serialize(const std::string &ch, T &data)
 {
-	std::timed_mutex mutex;
-	std::deque<Message> data;
-};
+	std::vector<uint8_t> buf;
+
+	auto to_bytes = [&buf](auto data) {
+		const auto bytes = reinterpret_cast<const uint8_t *>(&data);
+		buf.insert(buf.end(), bytes, bytes + sizeof(data));
+	};
+
+	to_bytes(DATA_SYNC);
+
+	to_bytes(ch.size());
+	buf.insert(buf.end(), ch.begin(), ch.end());
+
+	const auto dataBytes = data->serialize();
+	buf.insert(buf.end(), dataBytes.begin(), dataBytes.end());
+
+	return buf;
+}
 
 inline bool operator==(const M_VID_PROPS &lh, const M_VID_PROPS &rh)
 {

@@ -9,32 +9,32 @@
 
 bool testParserFrame()
 {
-	MF_FRAME frame;
+	std::shared_ptr<MF_FRAME> frame = std::make_shared<MF_FRAME>();
 
-	frame.time.rtStartTime = 0;
-	frame.time.rtEndTime = 1;
+	frame->time.rtStartTime = 0;
+	frame->time.rtEndTime = 1;
 
-	frame.av_props.vidProps.fccType = eMFCC_I420;
-	frame.av_props.vidProps.nWidth = 2;
-	frame.av_props.vidProps.nHeight = 3;
-	frame.av_props.vidProps.nRowBytes = 4;
-	frame.av_props.vidProps.nAspectX = 5;
-	frame.av_props.vidProps.nAspectY = 6;
-	frame.av_props.vidProps.dblRate = 7.89;
+	frame->av_props.vidProps.fccType = eMFCC_I420;
+	frame->av_props.vidProps.nWidth = 2;
+	frame->av_props.vidProps.nHeight = 3;
+	frame->av_props.vidProps.nRowBytes = 4;
+	frame->av_props.vidProps.nAspectX = 5;
+	frame->av_props.vidProps.nAspectY = 6;
+	frame->av_props.vidProps.dblRate = 7.89;
 
-	frame.av_props.audProps.nChannels = 10;
-	frame.av_props.audProps.nSamplesPerSec = 11;
-	frame.av_props.audProps.nBitsPerSample = 12;
-	frame.av_props.audProps.nTrackSplitBits = 13;
+	frame->av_props.audProps.nChannels = 10;
+	frame->av_props.audProps.nSamplesPerSec = 11;
+	frame->av_props.audProps.nBitsPerSample = 12;
+	frame->av_props.audProps.nTrackSplitBits = 13;
 
-	frame.str_user_props = "user_props";
+	frame->str_user_props = "user_props";
 
 	for (size_t i = 0; i < 10; ++i)
-		frame.vec_video_data.push_back(i);
+		frame->vec_video_data.push_back(i);
 	for (size_t i = 0; i < 10; ++i)
-		frame.vec_audio_data.push_back(i);
+		frame->vec_audio_data.push_back(i);
 
-	auto bytes = frame.serialize();
+	auto bytes = serialize("", frame);
 
 	PipeParser parser;
 	auto size = parser.parse(bytes.data(), bytes.size());
@@ -55,7 +55,7 @@ bool testParserFrame()
 
 	const auto data = parser.getData();
 
-	bytes.erase(bytes.begin(), bytes.begin() + 5); // Remove DATA_SYNC and data type from serialized data.
+	bytes.erase(bytes.begin(), bytes.begin() + 13); // Remove DATA_SYNC, data type byte and channel from serialized data.
 	if (bytes != data)
 	{
 		std::cout << "Frame parser failed: " << std::endl;
@@ -90,12 +90,12 @@ bool testParserFrame()
 
 bool testParserBuffer()
 {
-	MF_BUFFER buffer;
-	buffer.flags = eMFBF_Buffer;
+	std::shared_ptr<MF_BUFFER> buffer = std::make_shared<MF_BUFFER>();
+	buffer->flags = eMFBF_Buffer;
 	for (auto i = 0; i < 10; ++i)
-		buffer.data.push_back(i);
+		buffer->data.push_back(i);
 
-	auto bytes = buffer.serialize();
+	auto bytes = serialize("", buffer);
 
 	PipeParser parser;
 	auto size = parser.parse(bytes.data(), bytes.size());
@@ -116,7 +116,7 @@ bool testParserBuffer()
 
 	const auto data = parser.getData();
 
-	bytes.erase(bytes.begin(), bytes.begin() + 5); // Remove DATA_SYNC and data type from serialized data.
+	bytes.erase(bytes.begin(), bytes.begin() + 13); // Remove DATA_SYNC, data type byte and channel from serialized data.
 	if (bytes != data)
 	{
 		std::cout << "Buffer parser failed: " << std::endl;
@@ -150,9 +150,11 @@ bool testParserBuffer()
 
 bool testParserMessage()
 {
-	Message message = { "name", "param" };
+	std::shared_ptr<Message> message = std::make_shared<Message>();
+	message->name = "name";
+	message->param = "param";
 
-	auto bytes = message.serialize();
+	auto bytes = serialize("", message);
 
 	PipeParser parser;
 	auto size = parser.parse(bytes.data(), bytes.size());
@@ -173,7 +175,7 @@ bool testParserMessage()
 
 	const auto data = parser.getData();
 
-	bytes.erase(bytes.begin(), bytes.begin() + 5); // Remove DATA_SYNC and data type from serialized data.
+	bytes.erase(bytes.begin(), bytes.begin() + 13); // Remove DATA_SYNC, data type byte and channel from serialized data.
 	if (bytes != data)
 	{
 		std::cout << "Message parser failed: " << std::endl;

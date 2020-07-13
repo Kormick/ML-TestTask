@@ -14,7 +14,6 @@ class PipeReader
 {
 public:
 	PipeReader(std::shared_ptr<IoInterface> io,
-			   const std::string &pipeId,
 			   size_t maxBuffers,
 			   std::shared_ptr<DataBuffer> dataBuffer);
 
@@ -27,10 +26,7 @@ public:
 
 private:
 	volatile bool isRunning;
-	std::string pipeId;
-	int32_t fd;
 	size_t maxBuffers;
-
 	std::unique_ptr<std::thread> thread;
 	std::shared_ptr<IoInterface> io;
 	std::shared_ptr<DataBuffer> dataBuffer;

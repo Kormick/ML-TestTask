@@ -4,11 +4,8 @@
 #include "unistd.h"
 
 PipeWriter::PipeWriter(std::shared_ptr<IoInterface> io,
-					   const std::string &pipeId,
                        std::shared_ptr<DataBuffer> dataBuffer)
 	: isRunning(false),
-	  pipeId(pipeId),
-	  fd(-1),
 	  io(io),
 	  dataBuffer(dataBuffer)
 {}
@@ -62,9 +59,10 @@ void PipeWriter::run(std::shared_ptr<DataBuffer> dataBuffer)
 		if (!dataBuffer->data.empty())
 		{
 			size_t bytesWritten = 0;
-			const auto dataPtr = dataBuffer->data.front();
+			const auto dataPair = dataBuffer->data.front();
 			dataBuffer->data.pop_front();
-			const auto data = dataPtr->serialize();
+
+			const auto data = serialize(dataPair.first, dataPair.second);
 
 			do
 			{
@@ -80,9 +78,10 @@ void PipeWriter::run(std::shared_ptr<DataBuffer> dataBuffer)
 		if (!dataBuffer->messages.empty())
 		{
 			size_t bytesWritten = 0;
-			const auto dataPtr = dataBuffer->messages.front();
+			const auto dataPair = dataBuffer->messages.front();
 			dataBuffer->messages.pop_front();
-			const auto data = dataPtr.serialize();
+
+			const auto data = serialize(dataPair.first, dataPair.second);
 
 			do
 			{

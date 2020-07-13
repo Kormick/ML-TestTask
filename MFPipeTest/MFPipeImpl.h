@@ -73,8 +73,6 @@ private:
 	size_t maxBuffers;
 	MF_PIPE_INFO pipeInfo;
 
-	std::timed_mutex mutex;
-
 	std::shared_ptr<IoInterface> io;
 
 	std::shared_ptr<DataBuffer> readDataBuffer;
