@@ -3,6 +3,7 @@ project(MFPipe_Test)
 find_package(Threads)
 
 set(SOURCES
+	MFPipeImpl.cpp
 	pipe/PipeParser.cpp
 	pipe/PipeReader.cpp
 	pipe/PipeWriter.cpp
