@@ -39,34 +39,11 @@ public:
 			/*[in]*/ int _nMaxWaitMs,
 			/*[in]*/ const std::string &strHints) override;
 
-		if (!mutex.try_lock_for(std::chrono::milliseconds(_nMaxWaitMs)))
-		{
-			std::cout << "Failed to write buffer" << std::endl;
-			return S_FALSE;
-		}
-
-				 && bytesWritten < data.size());
-
-		mutex.unlock();
-
 	MF_HRESULT PipeGet(
 			/*[in]*/ const std::string &strChannel,
 			/*[out]*/ std::shared_ptr<MF_BASE_TYPE> &pBufferOrFrame,
 			/*[in]*/ int _nMaxWaitMs,
 			/*[in]*/ const std::string &strHints) override;
-		{
-			std::cout << "Failed to read buffer" << std::endl;
-			return S_FALSE;
-		}
-
-		do
-				{
-					case Parser::State::BUFFER_READY:
-					default:
-						break;
-		} while (std::chrono::steady_clock::now() < start + std::chrono::milliseconds(_nMaxWaitMs));
-
-		mutex.unlock();
 
 	MF_HRESULT PipePeek(
 			/*[in]*/ const std::string &strChannel,
@@ -81,34 +58,11 @@ public:
 			/*[in]*/ const std::string &strEventParam,
 			/*[in]*/ int _nMaxWaitMs) override;
 
-		if (!mutex.try_lock_for(std::chrono::milliseconds(_nMaxWaitMs)))
-		{
-			std::cout << "Failed to write message" << std::endl;
-			return S_FALSE;
-		}
-
-				 && bytesWritten < data.size());
-
-		mutex.unlock();
-
 	MF_HRESULT PipeMessageGet(
 			/*[in]*/ const std::string &strChannel,
 			/*[out]*/ std::string *pStrEventName,
 			/*[out]*/ std::string *pStrEventParam,
 			/*[in]*/ int _nMaxWaitMs) override;
-		{
-			std::cout << "Failed to read message" << std::endl;
-			return S_FALSE;
-		}
-
-		do
-				{
-					case Parser::State::MESSAGE_READY:
-						mutex.unlock();
-					default:
-						break;
-		} while (std::chrono::steady_clock::now() < start + std::chrono::milliseconds(_nMaxWaitMs));
-		mutex.unlock();
 
 	MF_HRESULT PipeFlush( /*[in]*/ const std::string &strChannel, /*[in]*/ eMFFlashFlags _eFlashFlags) override;
 
