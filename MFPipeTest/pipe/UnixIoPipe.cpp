@@ -24,8 +24,9 @@ bool IoPipe::create(const std::string &pipeId)
 	if (pipeId.empty())
 		return false;
 
-	remove(pipeId.c_str());
-	if (mkfifo(pipeId.c_str(), 0777) != 0)
+	auto res = mkfifo(pipeId.c_str(), 0777);
+
+	if (res != 0 && errno != EEXIST)
 		return false;
 
 	return true;
